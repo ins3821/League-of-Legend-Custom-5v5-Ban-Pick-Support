@@ -12,6 +12,8 @@
 -->
 
 ## 이런 때 씁니다
+<img width="3836" height="1844" alt="1" src="https://github.com/user-attachments/assets/254b0d88-4780-4fbe-9c51-05a1364bf256" />
+<img width="3839" height="1844" alt="2" src="https://github.com/user-attachments/assets/56ed54db-f458-4b74-8a6f-eb8ab2ecd9f0" />
 
 - 클랜·친구끼리 5대5 내전을 할 때, 게임 안의 밴픽 대신 대회 방식으로 진행하고 싶을 때
 - 한 명이 화면을 공유(디스코드 등)하고 나머지는 그 화면으로 구경하는 방식으로 진행할 때
