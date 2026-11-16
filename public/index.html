@@ -86,7 +86,7 @@ button{cursor:pointer}
 .track i.gap{margin-right:6px}
 
 /* 본문 */
-.main{flex:1;min-height:300px;display:grid;grid-template-columns:minmax(180px,240px) 1fr minmax(180px,240px);gap:12px;padding:12px 16px}
+.main{flex:1;min-height:400px;display:grid;grid-template-columns:minmax(180px,240px) 1fr minmax(180px,240px);gap:12px;padding:12px 16px}
 .side{display:flex;flex-direction:column;gap:8px;min-height:0}
 .side h2{margin:0;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.08em}
 .bans{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
@@ -232,6 +232,54 @@ body.castonly{background:transparent}
 body.castonly .timebar,body.castonly .top,body.castonly .track,body.castonly .main,body.castonly .bar,body.castonly .stop{display:none!important}
 body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
 
+/* 확정 전 고르는 중인 챔피언: 테두리만 깜박인다. 빛은 테두리에서 안쪽으로 조금만 번지고 가운데까지는 닿지 않는다 */
+@keyframes edgeglow{0%,100%{opacity:1}50%{opacity:.1}}
+.pick,.champ{position:relative}
+.pick.preview::after,.ban.preview::after,.cpick.preview::after,.cban.preview::after,.champ.sel::after{
+  content:"";display:block;position:absolute;inset:0;left:0;right:0;top:0;height:auto;transform:none;background:none;pointer-events:none;border-radius:inherit;
+  box-shadow:inset 0 0 0 2px var(--turn),inset 0 0 var(--glow,14px) var(--spread,1px) rgba(242,193,78,.75)}
+.ban.preview::after,.cban.preview::after{--glow:9px;--spread:0px}
+.champ.sel::after{--glow:13px}
+.cpick.preview::after{--glow:30px;--spread:3px}
+.now.preview{animation:none;box-shadow:none}
+@media (prefers-reduced-motion:no-preference){
+  .pick.preview::after,.ban.preview::after,.cpick.preview::after,.cban.preview::after,.champ.sel::after{animation:edgeglow 1.3s ease-in-out infinite}
+}
+/* 선택권 단계에서는 챔피언 목록을 숨긴다 */
+.insetup .pool .tools,.insetup .pool .grid{display:none}
+.pool{overflow:hidden}
+/* 첫 번째 선택권: 진영이 정해지기 전에는 팀 이름을 진영 색으로 칠하지 않는다 */
+.sidetbd #nameB,.sidetbd #nameR,.sidetbd .cm-name{color:var(--text)}
+.sidetbd .cm-lbl{visibility:hidden}
+.sidetbd .setup-t.B,.sidetbd .setup-t.R,.sidetbd .status .turn.B,.sidetbd .status .turn.R{color:var(--turn)}
+.sgrp{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--line);border-radius:6px}
+.sgrp b{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.06em}
+.sgrp div{display:flex;gap:8px;flex-wrap:wrap}
+.setup-a{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* 진영·선후픽 선택 */
+.setup{background:var(--panel);border:1px solid var(--turn);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.setup-t{font-family:var(--display);font-size:22px}
+.setup-t.B{color:var(--blue)} .setup-t.R{color:var(--red)}
+.setup-w{color:var(--muted);font-size:13px}
+.setup-b{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.sbtn{min-width:120px;font-weight:700;padding:12px 16px}
+.sbtn.B:not(:disabled){border-color:var(--blue);color:var(--blue)} .sbtn.R:not(:disabled){border-color:var(--red);color:var(--red)}
+.sbtn.first:not(:disabled),.sbtn.second:not(:disabled){border-color:var(--turn);color:var(--turn)}
+.hint{color:var(--muted);font-size:12px}
+/* 브금 */
+.bgm{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}
+.bgm summary{cursor:pointer;font-weight:600}
+.bgm-in{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.bgm-ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bgm select,.bgm input[type=text]{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+.bgm select{flex:1 1 260px;max-width:460px}
+.bgm input[type=text]{flex:1 1 160px;max-width:300px}
+.bgm input[type=range]{accent-color:var(--turn);width:110px}
+.bgm-msg{color:var(--turn);min-height:18px}
+.bgm-msg a{color:var(--turn)}
+.ytbox{width:240px;height:135px;background:#000;border:1px solid var(--line)}
+.bgm p{margin:0}
+
 @media (max-width:760px){
   html,body{height:auto}
   .top{grid-template-columns:1fr 1fr}
@@ -254,8 +302,8 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
     <h1><span data-i18n="wBan"></span><span data-i18n="wPick"></span></h1>
     <label class="field"><span data-i18n="lblLang"></span><select class="langsel" aria-label="Language"></select></label>
     <p data-i18n="createDesc"></p>
-    <label class="field"><span data-i18n="lblNameB"></span><input type="text" id="cNameB" maxlength="16" data-i18n-ph="blueTeam"></label>
-    <label class="field"><span data-i18n="lblNameR"></span><input type="text" id="cNameR" maxlength="16" data-i18n-ph="redTeam"></label>
+    <label class="field"><span data-i18n="lblTeam1"></span><input type="text" id="cNameB" maxlength="16" data-i18n-ph="team1"></label>
+    <label class="field"><span data-i18n="lblTeam2"></span><input type="text" id="cNameR" maxlength="16" data-i18n-ph="team2"></label>
     <label class="field"><span data-i18n="lblTurnSec"></span>
       <select id="cSec" class="secs"><option value="20"></option><option value="30" selected></option><option value="45"></option><option value="60"></option></select>
     </label>
@@ -295,6 +343,12 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
   </section>
 
   <section class="pool">
+    <div class="setup" id="setup" hidden>
+      <div class="setup-t" id="setupT"></div>
+      <div class="setup-w" id="setupW"></div>
+      <div class="setup-b" id="setupB"></div>
+      <div class="setup-a" id="setupA"></div>
+    </div>
     <div class="tools">
       <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
       <button class="chip" data-role="" aria-pressed="true" data-i18n="roleAll"></button>
@@ -332,6 +386,7 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
     <button class="btn win B" id="winB"></button>
     <button class="btn win R" id="winR"></button>
     <button class="btn" id="swap" data-i18n="swap"></button>
+    <button class="btn" id="flipFirst" data-i18n="flipFirst"></button>
     <button class="btn" id="wipe" data-i18n="wipe"></button>
   </span>
   <span class="setno" id="setno"></span>
@@ -340,6 +395,27 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
   <label class="opt"><select class="langsel" aria-label="Language"></select></label>
   <div class="net" id="net"></div>
   <details class="links" id="links" hidden><summary data-i18n="links"></summary><div class="rows" id="linkRows"></div></details>
+  <details class="bgm" id="bgm"><summary data-i18n="bgm"></summary>
+    <div class="bgm-in">
+      <div class="bgm-ctl">
+        <select id="bgmSel" data-i18n-aria="bgm"></select>
+        <button class="btn small" id="bgmPlay" data-i18n="bgmPlay"></button>
+        <button class="btn small" id="bgmStop" data-i18n="bgmStop"></button>
+        <label class="opt"><span data-i18n="bgmVol"></span><input type="range" id="bgmVol" min="0" max="100" value="40"></label>
+        <label class="opt"><input type="checkbox" id="bgmLoop" checked> <span data-i18n="bgmLoop"></span></label>
+        <label class="opt"><input type="checkbox" id="bgmAuto"> <span data-i18n="bgmAuto"></span></label>
+      </div>
+      <div class="bgm-ctl">
+        <input type="text" id="bgmName" maxlength="40" data-i18n-ph="bgmNamePh">
+        <input type="text" id="bgmUrl" data-i18n-ph="bgmUrlPh">
+        <button class="btn small" id="bgmAdd" data-i18n="bgmAddBtn"></button>
+        <button class="btn small" id="bgmDel" data-i18n="bgmDelBtn"></button>
+      </div>
+      <div class="bgm-msg" id="bgmMsg" role="status"></div>
+      <p class="hint" data-i18n="bgmNote"></p>
+      <div class="ytbox"><div id="ytp"></div></div>
+    </div>
+  </details>
   <div id="out"></div>
 </footer>
 
@@ -365,9 +441,9 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
     <div class="cast-main">
       <div class="cteam B" id="cpicksB"></div>
       <div class="cmid">
-        <div class="cm-side B"><div class="pips" id="pipsB"></div><div class="cm-lbl" data-i18n="blueSide"></div><div class="cm-name" id="cmNameB"></div></div>
+        <div class="cm-side B"><div class="pips" id="pipsB"></div><div class="cm-lbl" id="cmLblB"></div><div class="cm-name" id="cmNameB"></div></div>
         <div class="cm-center"><div class="cm-arrow" id="cmArrow"></div><div class="cm-timer" id="cmTimer"></div></div>
-        <div class="cm-side R"><div class="pips" id="pipsR"></div><div class="cm-lbl" data-i18n="redSide"></div><div class="cm-name" id="cmNameR"></div></div>
+        <div class="cm-side R"><div class="pips" id="pipsR"></div><div class="cm-lbl" id="cmLblR"></div><div class="cm-name" id="cmNameR"></div></div>
         <div class="cm-foot" id="cmFoot"></div>
       </div>
       <div class="cteam R" id="cpicksR"></div>
@@ -387,6 +463,7 @@ const ORDER = "Bb Rb Bb Rb Bb Rb Bp Rp Rp Bp Bp Rp Rb Bb Rb Bb Rp Bp Bp Rp".spli
   const team = s[0], type = s[1] === "b" ? "ban" : "pick";
   return { team, type, idx: arr.slice(0, i).filter(x => x === s).length };
 });
+const ORDER_R = ORDER.map(o => ({ ...o, team: o.team === "B" ? "R" : "B" })); // 선픽이 레드 진영일 때
 const PHASE_ENDS = [6, 12, 16, 20];
 
 // ── 언어 ──────────────────────────────────────────────────────
@@ -395,7 +472,7 @@ const LANGS = { ko: ["한국어", "ko"], en: ["English", "en"], ja: ["日本語"
 const I18N = {
   ko: {
     title: "롤 5대5 밴픽", wBan: "밴", wPick: "픽", createTitle: "방 만들기",
-    createDesc: "방을 만들면 블루 주장·레드 주장 초대 링크를 복사할 수 있습니다. 관전은 화면 공유로 진행하세요.",
+    createDesc: "팀 이름만 정하고 방을 만드세요. 진영과 밴픽 순서는 다음 단계에서 '첫 번째 선택권'으로 정합니다.",
     lblNameB: "블루 팀 이름", lblNameR: "레드 팀 이름", lblTurnSec: "차례당 제한 시간", sec: "{n}초", lblSeries: "시리즈 방식",
     bo3: "3판 2선승", bo5: "5판 3선승", fearlessLong: "피어리스 (이전 세트에서 고른 챔피언 재사용 금지)", btnCreate: "방 만들기",
     errCreate: "방을 만들지 못했습니다.", errFull: "방이 너무 많습니다. 잠시 후 다시 시도해 주세요.", errServer: "서버에 연결하지 못했습니다.", lblLang: "언어",
@@ -422,11 +499,22 @@ const I18N = {
     loadingChamps: "챔피언 목록을 불러오는 중입니다.", noResults: "검색 결과가 없습니다.", tBanned: "밴됨", tUsed: "이전 세트에서 사용", tPicked: "픽됨", playerPh: "선수 이름",
     setN: "{set}세트", seriesWin: "{team} 시리즈 승리", dataVer: "데이터 {v}", seriesBan: "시리즈 밴", noneYet: "아직 없음", timeOver: "시간 초과",
     resTitle: "[{set}세트 밴픽]", resBlue: "블루", resRed: "레드",
+    phSetup: "{set}세트 · 첫 번째 선택권", setupTitle: "첫 번째 선택권 진행 중", setupTurn: "{team} 선택 차례",
+    setupWhyRandom: "1세트의 첫 번째 선택권은 무작위로 정해졌습니다.",
+    setupWhyLoser: "직전 세트에서 진 팀이 첫 번째 선택권을 가집니다.",
+    setupWhy2: "남은 항목을 고르세요.", setupRandom: "전부 무작위로 정하기", setupWait: "선택을 기다리는 중입니다",
+    firstPick: "선픽", secondPick: "후픽", flipFirst: "선후픽 교체",
+    bgm: "밴픽 브금", bgmPlay: "재생", bgmStop: "정지", bgmVol: "음량", bgmLoop: "반복", bgmAuto: "밴픽 진행 중 자동 재생", bgmWorlds: "롤드컵", bgmCustom: "직접 추가한 곡",
+    bgmNamePh: "곡 이름 (선택)", bgmUrlPh: "유튜브 주소", bgmAddBtn: "추가", bgmDelBtn: "선택한 곡 삭제",
+    bgmErrEmbed: "이 영상은 다른 사이트에서의 재생이 막혀 있습니다.", bgmErrGone: "영상을 재생할 수 없습니다. 삭제됐거나 비공개일 수 있습니다.", bgmErrLoad: "유튜브 플레이어를 불러오지 못했습니다.",
+    bgmBadUrl: "유튜브 주소를 인식하지 못했습니다.", bgmOnlyCustom: "직접 추가한 곡만 삭제할 수 있습니다.", bgmOpen: "유튜브에서 열기",
+    bgmNote: "브금은 이 브라우저에서만 재생됩니다. 화면 공유로 들려주려면 소리 공유를 켜세요.",
+    lblTeam1: "팀 1 이름", lblTeam2: "팀 2 이름", team1: "팀 1", team2: "팀 2", fsTitle: "첫 번째 선택권: {team}", fsRule: "진영 선택과 밴픽 순서 중 한 가지만 고릅니다. 고르지 않은 쪽은 상대 팀이 정합니다.", setupWhyHost: "진행자가 첫 번째 선택권을 정했습니다.", fsChose: "{team}의 선택: {choice}", grpSide: "진영 선택", grpOrder: "밴픽 순서", fsGive: "선택권을 상대 팀에게 넘기기",
     denied: "들어올 수 없습니다", deniedSub: "진행자에게 받은 초대 링크로 접속해 주세요", noRoom: "없는 방입니다", noRoomSub: "방이 만료되었거나 주소가 잘못되었습니다", newRoom: "새 방 만들기",
   },
   en: {
     title: "LoL 5v5 Ban/Pick", wBan: "Ban", wPick: "Pick", createTitle: "Create a room",
-    createDesc: "After creating a room you can copy invite links for the blue and red captains. Spectators watch through screen sharing.",
+    createDesc: "Enter the team names and create the room. Side and pick order are decided in the next step with First Selection.",
     lblNameB: "Blue team name", lblNameR: "Red team name", lblTurnSec: "Time limit per turn", sec: "{n}s", lblSeries: "Series format",
     bo3: "Best of 3", bo5: "Best of 5", fearlessLong: "Fearless (champions picked in earlier games cannot be picked again)", btnCreate: "Create room",
     errCreate: "Could not create the room.", errFull: "Too many rooms right now. Try again shortly.", errServer: "Could not reach the server.", lblLang: "Language",
@@ -453,11 +541,22 @@ const I18N = {
     loadingChamps: "Loading champions.", noResults: "No champions found.", tBanned: "Banned", tUsed: "Used in an earlier game", tPicked: "Picked", playerPh: "Player name",
     setN: "Game {set}", seriesWin: "{team} wins the series", dataVer: "Data {v}", seriesBan: "SERIES BANS", noneYet: "None yet", timeOver: "Time over",
     resTitle: "[Game {set} draft]", resBlue: "Blue", resRed: "Red",
+    phSetup: "Game {set} · First Selection", setupTitle: "First Selection in progress", setupTurn: "{team} to choose",
+    setupWhyRandom: "First Selection for game 1 was decided at random.",
+    setupWhyLoser: "The team that lost the previous game has First Selection.",
+    setupWhy2: "Choose the remaining option.", setupRandom: "Randomize everything", setupWait: "Waiting for the choice",
+    firstPick: "First pick", secondPick: "Second pick", flipFirst: "Swap pick order",
+    bgm: "Draft music", bgmPlay: "Play", bgmStop: "Stop", bgmVol: "Volume", bgmLoop: "Loop", bgmAuto: "Play automatically during the draft", bgmWorlds: "Worlds", bgmCustom: "Added by you",
+    bgmNamePh: "Track name (optional)", bgmUrlPh: "YouTube link", bgmAddBtn: "Add", bgmDelBtn: "Remove selected",
+    bgmErrEmbed: "This video does not allow playback on other sites.", bgmErrGone: "This video cannot be played. It may be deleted or private.", bgmErrLoad: "Could not load the YouTube player.",
+    bgmBadUrl: "That does not look like a YouTube link.", bgmOnlyCustom: "Only tracks you added can be removed.", bgmOpen: "Open on YouTube",
+    bgmNote: "Music plays only in this browser. To let others hear it over screen sharing, share audio too.",
+    lblTeam1: "Team 1 name", lblTeam2: "Team 2 name", team1: "Team 1", team2: "Team 2", fsTitle: "First Selection: {team}", fsRule: "Choose only one: a side or the pick order. The other team decides the one you leave.", setupWhyHost: "The host assigned First Selection.", fsChose: "{team} chose: {choice}", grpSide: "SIDE", grpOrder: "PICK ORDER", fsGive: "Give First Selection to the other team",
     denied: "Access denied", deniedSub: "Open the invite link you received from the host", noRoom: "Room not found", noRoomSub: "The room has expired or the address is wrong", newRoom: "Create a new room",
   },
   ja: {
     title: "LoL 5対5 バン/ピック", wBan: "バン", wPick: "ピック", createTitle: "ルーム作成",
-    createDesc: "ルームを作成すると、ブルー・レッド各キャプテン用の招待リンクをコピーできます。観戦は画面共有で行ってください。",
+    createDesc: "チーム名だけ入力してルームを作成します。サイドとピック順は次のステップの「ファーストセレクション」で決めます。",
     lblNameB: "ブルーチーム名", lblNameR: "レッドチーム名", lblTurnSec: "1ターンの制限時間", sec: "{n}秒", lblSeries: "シリーズ形式",
     bo3: "BO3（2本先取）", bo5: "BO5（3本先取）", fearlessLong: "フィアレス（前のゲームでピックしたチャンピオンは再使用不可）", btnCreate: "ルームを作成",
     errCreate: "ルームを作成できませんでした。", errFull: "ルームが多すぎます。しばらくしてからお試しください。", errServer: "サーバーに接続できませんでした。", lblLang: "言語",
@@ -484,11 +583,22 @@ const I18N = {
     loadingChamps: "チャンピオン一覧を読み込み中です。", noResults: "該当するチャンピオンがありません。", tBanned: "バン済み", tUsed: "前のゲームで使用済み", tPicked: "ピック済み", playerPh: "選手名",
     setN: "第{set}ゲーム", seriesWin: "{team} シリーズ勝利", dataVer: "データ {v}", seriesBan: "シリーズバン", noneYet: "まだなし", timeOver: "時間切れ",
     resTitle: "[第{set}ゲーム ドラフト]", resBlue: "ブルー", resRed: "レッド",
+    phSetup: "第{set}ゲーム · ファーストセレクション", setupTitle: "ファーストセレクション進行中", setupTurn: "{team} の選択",
+    setupWhyRandom: "第1ゲームのファーストセレクションはランダムで決まりました。",
+    setupWhyLoser: "前のゲームで負けたチームがファーストセレクションを持ちます。",
+    setupWhy2: "残りの項目を選んでください。", setupRandom: "すべてランダムで決める", setupWait: "選択を待っています",
+    firstPick: "先ピック", secondPick: "後ピック", flipFirst: "ピック順を入れ替え",
+    bgm: "ドラフトBGM", bgmPlay: "再生", bgmStop: "停止", bgmVol: "音量", bgmLoop: "リピート", bgmAuto: "ドラフト中に自動再生", bgmWorlds: "Worlds", bgmCustom: "追加した曲",
+    bgmNamePh: "曲名（任意）", bgmUrlPh: "YouTubeのURL", bgmAddBtn: "追加", bgmDelBtn: "選択した曲を削除",
+    bgmErrEmbed: "この動画は他サイトでの再生が許可されていません。", bgmErrGone: "この動画は再生できません。削除または非公開の可能性があります。", bgmErrLoad: "YouTubeプレーヤーを読み込めませんでした。",
+    bgmBadUrl: "YouTubeのURLを認識できませんでした。", bgmOnlyCustom: "削除できるのは自分で追加した曲だけです。", bgmOpen: "YouTubeで開く",
+    bgmNote: "BGMはこのブラウザでのみ再生されます。画面共有で聞かせるには音声共有をオンにしてください。",
+    lblTeam1: "チーム1の名前", lblTeam2: "チーム2の名前", team1: "チーム1", team2: "チーム2", fsTitle: "ファーストセレクション: {team}", fsRule: "サイドとピック順のどちらか一方だけを選びます。選ばなかった方は相手チームが決めます。", setupWhyHost: "進行役がファーストセレクションを指定しました。", fsChose: "{team} の選択: {choice}", grpSide: "サイド", grpOrder: "ピック順", fsGive: "選択権を相手チームに渡す",
     denied: "入室できません", deniedSub: "進行役から受け取った招待リンクでアクセスしてください", noRoom: "ルームが見つかりません", noRoomSub: "ルームの期限が切れたか、アドレスが間違っています", newRoom: "新しいルームを作成",
   },
   zh: {
     title: "英雄联盟 5v5 BP", wBan: "禁用", wPick: "选用", createTitle: "创建房间",
-    createDesc: "创建房间后，可以复制蓝色方和红色方队长的邀请链接。观众请通过屏幕共享观看。",
+    createDesc: "只需填写队名并创建房间。阵营和选人顺序将在下一步通过“优先选择权”决定。",
     lblNameB: "蓝色方队名", lblNameR: "红色方队名", lblTurnSec: "每回合限时", sec: "{n}秒", lblSeries: "赛制",
     bo3: "三局两胜", bo5: "五局三胜", fearlessLong: "无畏征召（之前对局选用过的英雄不能再次选用）", btnCreate: "创建房间",
     errCreate: "无法创建房间。", errFull: "房间数量过多，请稍后再试。", errServer: "无法连接服务器。", lblLang: "语言",
@@ -515,11 +625,22 @@ const I18N = {
     loadingChamps: "正在加载英雄列表。", noResults: "没有找到英雄。", tBanned: "已禁用", tUsed: "之前对局已使用", tPicked: "已选用", playerPh: "选手名",
     setN: "第{set}局", seriesWin: "{team} 赢得系列赛", dataVer: "数据 {v}", seriesBan: "系列赛禁用", noneYet: "暂无", timeOver: "超时",
     resTitle: "[第{set}局 BP]", resBlue: "蓝色方", resRed: "红色方",
+    phSetup: "第{set}局 · 优先选择权", setupTitle: "正在进行优先选择", setupTurn: "轮到 {team} 选择",
+    setupWhyRandom: "第一局的优先选择权已随机决定。",
+    setupWhyLoser: "上一局的负方拥有优先选择权。",
+    setupWhy2: "请选择剩下的一项。", setupRandom: "全部随机决定", setupWait: "等待选择",
+    firstPick: "先选", secondPick: "后选", flipFirst: "交换选人顺序",
+    bgm: "BP 背景音乐", bgmPlay: "播放", bgmStop: "停止", bgmVol: "音量", bgmLoop: "循环", bgmAuto: "BP 进行时自动播放", bgmWorlds: "全球总决赛", bgmCustom: "自己添加的曲目",
+    bgmNamePh: "曲名（可选）", bgmUrlPh: "YouTube 链接", bgmAddBtn: "添加", bgmDelBtn: "删除所选曲目",
+    bgmErrEmbed: "该视频不允许在其他网站播放。", bgmErrGone: "无法播放该视频，可能已被删除或设为私享。", bgmErrLoad: "无法加载 YouTube 播放器。",
+    bgmBadUrl: "无法识别该 YouTube 链接。", bgmOnlyCustom: "只能删除自己添加的曲目。", bgmOpen: "在 YouTube 打开",
+    bgmNote: "音乐只在此浏览器中播放。如需通过屏幕共享让他人听到，请同时共享声音。",
+    lblTeam1: "队伍1名称", lblTeam2: "队伍2名称", team1: "队伍1", team2: "队伍2", fsTitle: "优先选择权：{team}", fsRule: "阵营和选人顺序只能选一项。没有选的那一项由对方决定。", setupWhyHost: "主持人指定了优先选择权。", fsChose: "{team} 选择了：{choice}", grpSide: "阵营", grpOrder: "选人顺序", fsGive: "把选择权交给对方",
     denied: "无法进入", deniedSub: "请使用主持人发给你的邀请链接", noRoom: "房间不存在", noRoomSub: "房间已过期或地址有误", newRoom: "创建新房间",
   },
   ru: {
     title: "LoL 5v5 — баны и пики", wBan: "Бан", wPick: "Пик", createTitle: "Создать комнату",
-    createDesc: "После создания комнаты можно скопировать ссылки-приглашения для капитанов синей и красной команд. Зрители смотрят через демонстрацию экрана.",
+    createDesc: "Введите только названия команд и создайте комнату. Сторона и очерёдность пика определяются на следующем шаге по правилу «право первого выбора».",
     lblNameB: "Название синей команды", lblNameR: "Название красной команды", lblTurnSec: "Лимит времени на ход", sec: "{n} с", lblSeries: "Формат серии",
     bo3: "До 2 побед (Bo3)", bo5: "До 3 побед (Bo5)", fearlessLong: "Fearless (чемпионов, выбранных в прошлых играх, нельзя брать снова)", btnCreate: "Создать комнату",
     errCreate: "Не удалось создать комнату.", errFull: "Слишком много комнат. Попробуйте позже.", errServer: "Не удалось подключиться к серверу.", lblLang: "Язык",
@@ -546,6 +667,17 @@ const I18N = {
     loadingChamps: "Загрузка списка чемпионов.", noResults: "Чемпионы не найдены.", tBanned: "Забанен", tUsed: "Использован в прошлой игре", tPicked: "Выбран", playerPh: "Имя игрока",
     setN: "Игра {set}", seriesWin: "{team} побеждает в серии", dataVer: "Данные {v}", seriesBan: "БАНЫ СЕРИИ", noneYet: "Пока нет", timeOver: "Время вышло",
     resTitle: "[Драфт, игра {set}]", resBlue: "Синие", resRed: "Красные",
+    phSetup: "Игра {set} · право первого выбора", setupTitle: "Идёт первый выбор", setupTurn: "Выбирает {team}",
+    setupWhyRandom: "Право первого выбора в первой игре определено случайно.",
+    setupWhyLoser: "Право первого выбора у команды, проигравшей прошлую игру.",
+    setupWhy2: "Выберите оставшийся вариант.", setupRandom: "Определить всё случайно", setupWait: "Ожидание выбора",
+    firstPick: "Первый пик", secondPick: "Второй пик", flipFirst: "Поменять очерёдность",
+    bgm: "Музыка драфта", bgmPlay: "Играть", bgmStop: "Стоп", bgmVol: "Громкость", bgmLoop: "Повтор", bgmAuto: "Включать автоматически во время драфта", bgmWorlds: "Worlds", bgmCustom: "Добавлено вами",
+    bgmNamePh: "Название (необязательно)", bgmUrlPh: "Ссылка на YouTube", bgmAddBtn: "Добавить", bgmDelBtn: "Удалить выбранное",
+    bgmErrEmbed: "Это видео нельзя воспроизводить на других сайтах.", bgmErrGone: "Видео не воспроизводится. Возможно, оно удалено или скрыто.", bgmErrLoad: "Не удалось загрузить проигрыватель YouTube.",
+    bgmBadUrl: "Не удалось распознать ссылку на YouTube.", bgmOnlyCustom: "Удалять можно только добавленные вами треки.", bgmOpen: "Открыть на YouTube",
+    bgmNote: "Музыка играет только в этом браузере. Чтобы её слышали при демонстрации экрана, включите передачу звука.",
+    lblTeam1: "Название команды 1", lblTeam2: "Название команды 2", team1: "Команда 1", team2: "Команда 2", fsTitle: "Право первого выбора: {team}", fsRule: "Выберите только одно: сторону или очерёдность пика. Оставшееся решает соперник.", setupWhyHost: "Право первого выбора назначил ведущий.", fsChose: "Выбор {team}: {choice}", grpSide: "СТОРОНА", grpOrder: "ОЧЕРЁДНОСТЬ ПИКА", fsGive: "Передать право выбора сопернику",
     denied: "Вход запрещён", deniedSub: "Откройте ссылку-приглашение, полученную от ведущего", noRoom: "Комната не найдена", noRoomSub: "Срок действия комнаты истёк или адрес неверен", newRoom: "Создать новую комнату",
   },
 };
@@ -593,7 +725,7 @@ if (!ROOM) {
     $("cErr").textContent = "";
     try {
       const r = await fetch("/api/rooms", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nameB: $("cNameB").value, nameR: $("cNameR").value, turnSec: Number($("cSec").value), bestOf: Number($("cBo").value), fearless: $("cFearless").checked }) });
+        body: JSON.stringify({ nameB: $("cNameB").value.trim() || T("team1"), nameR: $("cNameR").value.trim() || T("team2"), turnSec: Number($("cSec").value), bestOf: Number($("cBo").value), fearless: $("cFearless").checked }) });
       const j = await r.json();
       if (!r.ok) { $("cErr").textContent = T(j.error === "full" ? "errFull" : "errCreate"); return; }
       location.href = `?room=${encodeURIComponent(j.room)}&key=${encodeURIComponent(j.keys.admin)}`;
@@ -613,7 +745,9 @@ function startApp() {
 
   const img = c => c && c.img && VER ? `https://ddragon.leagueoflegends.com/cdn/${VER}/img/champion/${c.img}` : "";
   const nameOf = id => id ? (BY[id] ? BY[id].name : id) : "";
-  const step = () => ORDER[S.hist.length];
+  const ord = () => (S && S.first === "R" ? ORDER_R : ORDER); // 순서표의 첫 팀 = 선픽 팀
+  const other = t => (t === "B" ? "R" : "B");
+  const step = () => ord()[S.hist.length];
   const done = () => S.hist.length >= ORDER.length;
   const isAdmin = () => role === "admin";
   const teamName = t => (t === "B" ? S.nameB : S.nameR) || T(t === "B" ? "blueTeam" : "redTeam"); // 이름을 비워 두면 보는 사람의 언어로 표시
@@ -623,7 +757,7 @@ function startApp() {
 
   function stateOf(id) {
     const i = S.hist.indexOf(id);
-    if (i >= 0) return ORDER[i].type === "ban" ? "banned" : "p" + ORDER[i].team;
+    if (i >= 0) return ord()[i].type === "ban" ? "banned" : "p" + ord()[i].team;
     if (S.fearless && S.used.includes(id)) return "used";
     return "";
   }
@@ -633,7 +767,7 @@ function startApp() {
     const live = S.status === "live" && !done();
     for (const t of ["B", "R"]) {
       const bans = [], picks = [];
-      ORDER.forEach((o, i) => { if (o.team === t) (o.type === "ban" ? bans : picks)[o.idx] = i; });
+      ord().forEach((o, i) => { if (o.team === t) (o.type === "ban" ? bans : picks)[o.idx] = i; });
       $("bans" + t).innerHTML = bans.map(i => {
         const past = i < S.hist.length, now = live && i === S.hist.length;
         const id = past ? S.hist[i] : now ? S.sel : "", src = img(BY[id]);
@@ -650,17 +784,21 @@ function startApp() {
       if (document.activeElement !== nm) nm.value = (t === "B" ? S.nameB : S.nameR) || "";
       nm.readOnly = !(isAdmin() || role === t);
       const cap = $("cap" + t);
-      cap.textContent = role === t ? T("capMe") : online[t] ? T("capOn") : T("capOff");
+      cap.textContent = (role === t ? T("capMe") : online[t] ? T("capOn") : T("capOff")) + (S.status === "setup" ? "" : " · " + T(S.first === t ? "firstPick" : "secondPick"));
       cap.className = "cap" + (role === t ? " me" : online[t] ? " on" : "");
     }
   }
 
   function renderStatus() {
     const n = S.hist.length, live = S.status === "live" && !done();
-    $("track").innerHTML = ORDER.map((o, i) =>
+    $("track").innerHTML = ord().map((o, i) =>
       `<i class="${o.team} t-${o.type} ${i < n ? "done" : ""} ${live && i === n ? "now" : ""} ${[5, 11, 15].includes(i) ? "gap" : ""}"></i>`).join("");
     const turn = $("turn"), o = done() ? null : step(), adm = isAdmin();
-    if (S.status === "lobby") {
+    if (S.status === "setup" && S.setup) {
+      const actor = S.setup.stage === 1 ? S.setup.chooser : other(S.setup.chooser);
+      $("phase").textContent = T("phSetup", { set: S.setNo });
+      turn.className = "turn " + actor; turn.textContent = T("setupTurn", { team: teamName(actor) });
+    } else if (S.status === "lobby") {
       $("phase").textContent = T("phLobby", { set: S.setNo, sec: S.turnSec });
       turn.className = "turn"; turn.textContent = T("waitStart");
     } else if (done()) {
@@ -674,6 +812,7 @@ function startApp() {
     }
     const c = $("confirm");
     if (!connected) { c.textContent = T("reconnecting"); c.disabled = true; }
+    else if (S.status === "setup") { c.textContent = T("setupTitle"); c.disabled = true; }
     else if (S.status === "lobby") { c.textContent = T(adm ? "startDraft" : "waitHost"); c.disabled = !adm; }
     else if (done()) { c.textContent = T("complete"); c.disabled = true; }
     else if (S.status === "stopped") { c.textContent = T("stoppedBtn"); c.disabled = true; }
@@ -693,6 +832,7 @@ function startApp() {
     }
     $("optBo").value = S.winsNeeded === 3 ? "5" : "3";
     $("swap").disabled = S.status === "live";
+    $("flipFirst").disabled = S.status === "live" || n > 0;
     $("optSec").disabled = S.status === "live";
     if (![...$("optSec").options].some(op => op.value === String(S.turnSec))) $("optSec").add(new Option(T("sec", { n: S.turnSec }), S.turnSec));
     $("optSec").value = String(S.turnSec);
@@ -712,8 +852,40 @@ function startApp() {
       $("stopSub").textContent = T("stopSub", { set: S.setNo, phase: phaseName(n), n: n + 1 }) + (adm ? "" : " · " + T("stopWait"));
       $("stopActs").hidden = !adm;
     }
-    renderLinks(); tick();
+    renderSetup(); renderLinks(); tick();
   }
+
+  // 첫 번째 선택권: 선택권을 가진 팀이 진영 또는 밴픽 순서 중 한 가지만 고르고, 상대 팀이 나머지를 정한다
+  function renderSetup() {
+    const box = $("setup"), st = S.setup, on = S.status === "setup" && !!st;
+    box.hidden = !on;
+    document.body.classList.toggle("insetup", on);
+    document.body.classList.toggle("sidetbd", on && (st.stage === 1 || st.need === "side")); // 진영 미정
+    if (!on) return;
+    const actor = st.stage === 1 ? st.chooser : other(st.chooser), can = connected && (isAdmin() || role === actor);
+    const label = { B: "blueSide", R: "redSide", first: "firstPick", second: "secondPick" };
+    const btn = o => `<button class="btn sbtn ${o}" data-pick="${o}" ${can ? "" : "disabled"}>${esc(T(label[o]))}</button>`;
+    const grp = (title, opts) => `<div class="sgrp"><b>${esc(T(title))}</b><div>${opts.map(btn).join("")}</div></div>`;
+    $("setupT").className = "setup-t " + actor;
+    if (st.stage === 1) {
+      $("setupT").textContent = T("fsTitle", { team: teamName(actor) });
+      $("setupW").textContent = T({ loser: "setupWhyLoser", host: "setupWhyHost" }[st.why] || "setupWhyRandom") + " " + T("fsRule");
+      $("setupB").innerHTML = grp("grpSide", ["B", "R"]) + grp("grpOrder", ["first", "second"]);
+    } else {
+      // 첫 번째 팀이 고른 것을 보여 주고, 남은 종류만 고르게 한다
+      const made = st.need === "order" ? T(st.chooser === "B" ? "blueSide" : "redSide") : T(S.first === st.chooser ? "firstPick" : "secondPick");
+      $("setupT").textContent = T("setupTurn", { team: teamName(actor) });
+      $("setupW").textContent = T("fsChose", { team: teamName(st.chooser), choice: made }) + " · " + T("setupWhy2");
+      $("setupB").innerHTML = st.need === "side" ? grp("grpSide", ["B", "R"]) : grp("grpOrder", ["first", "second"]);
+    }
+    $("setupA").innerHTML = (can ? "" : `<span class="hint">${esc(T("setupWait"))}</span>`) + (isAdmin()
+      ? (st.stage === 1 ? `<button class="btn small" data-pick="give">${esc(T("fsGive"))}</button>` : "") + `<button class="btn small" data-pick="random">${esc(T("setupRandom"))}</button>` : "");
+  }
+  $("setup").addEventListener("click", e => {
+    const b = e.target.closest("[data-pick]"); if (!b || b.disabled) return;
+    const p = b.dataset.pick;
+    send(p === "random" ? { t: "random" } : p === "give" ? { t: "giveFirst" } : { t: "choose", pick: p });
+  });
 
   let linksKey = "", linkUrls = [], linksOpened = false;
   function renderLinks() {
@@ -788,10 +960,10 @@ function startApp() {
     const live = S.status === "live" && !done(), n = S.hist.length;
     for (const t of ["B", "R"]) {
       const bans = [], picks = [];
-      ORDER.forEach((o, i) => { if (o.team === t) (o.type === "ban" ? bans : picks)[o.idx] = i; });
+      ord().forEach((o, i) => { if (o.team === t) (o.type === "ban" ? bans : picks)[o.idx] = i; });
       $("cbans" + t).innerHTML = bans.map(i => {
         const past = i < n, now = live && i === n, id = past ? S.hist[i] : now ? S.sel : "", src = img(BY[id]);
-        return `<div class="cban ${now ? "now" : ""}" title="${esc(nameOf(id))}">${id ? (src ? `<img src="${esc(src)}" alt="${esc(nameOf(id))}">` : esc(nameOf(id))) : ""}</div>`;
+        return `<div class="cban ${now ? "now" : ""} ${now && id ? "preview" : ""}" title="${esc(nameOf(id))}">${id ? (src ? `<img src="${esc(src)}" alt="${esc(nameOf(id))}">` : esc(nameOf(id))) : ""}</div>`;
       }).join("");
       picks.forEach((i, k) => {
         const el = $(`cp${t}${k}`), past = i < n, now = live && i === n, id = past ? S.hist[i] : now ? S.sel : "", src = splash(id);
@@ -810,9 +982,10 @@ function startApp() {
       if (pips.children.length !== need) pips.innerHTML = Array.from({ length: need }, (_, i) => `<button data-i="${i}" aria-label="${t} ${i + 1}"></button>`).join("");
       pips.querySelectorAll("button").forEach((b, i) => { b.className = i < sc ? "on" : ""; b.disabled = !isAdmin() || CAST_ONLY; });
       $("cmName" + t).textContent = teamName(t);
+      $("cmLbl" + t).textContent = T(t === "B" ? "blueSide" : "redSide") + (S.status === "setup" ? "" : " · " + T(S.first === t ? "firstPick" : "secondPick"));
     }
     $("cmArrow").textContent = live ? (step().team === "B" ? "◀" : "▶") : "";
-    const mid = S.seriesWinner ? T("seriesWin", { team: teamName(S.seriesWinner) }) : S.status === "lobby" ? T("waitStart") : done() ? T("draftDone") : phaseName(n);
+    const mid = S.seriesWinner ? T("seriesWin", { team: teamName(S.seriesWinner) }) : S.status === "setup" ? T("setupTitle") : S.status === "lobby" ? T("waitStart") : done() ? T("draftDone") : phaseName(n);
     $("cmFoot").textContent = [T("setN", { set: S.setNo }), mid, T(S.winsNeeded === 3 ? "bo5" : "bo3")].concat(VER ? [T("dataVer", { v: VER })] : []).join(" · ");
     // 시리즈 밴: 피어리스에서 이전 세트에 쓴 챔피언, 세트(10명)별 묶음
     const groups = [];
@@ -881,6 +1054,7 @@ function startApp() {
   $("winR").onclick = () => send({ t: "win", team: "R" });
   $("optBo").onchange = e => send({ t: "opts", bestOf: Number(e.target.value) });
   $("swap").onclick = () => send({ t: "swap" });
+  $("flipFirst").onclick = () => send({ t: "flipFirst" });
   $("wipe").onclick = () => send({ t: "wipe" });
   $("optSec").onchange = e => send({ t: "opts", turnSec: Number(e.target.value) });
   $("optFearless").onchange = e => send({ t: "opts", fearless: e.target.checked });
@@ -890,7 +1064,7 @@ function startApp() {
     if (!S) return;
     const line = t => {
       const b = [], p = [];
-      ORDER.forEach((o, i) => { if (o.team === t && i < S.hist.length) (o.type === "ban" ? b : p).push(nameOf(S.hist[i]) || T("none")); });
+      ord().forEach((o, i) => { if (o.team === t && i < S.hist.length) (o.type === "ban" ? b : p).push(nameOf(S.hist[i]) || T("none")); });
       return `${T(t === "B" ? "resBlue" : "resRed")} ${teamName(t)}\n  ${T("bans")}: ${b.join(", ") || "-"}\n  ${T("picks")}: ${p.join(", ") || "-"}`;
     };
     const text = `${T("resTitle", { set: S.setNo })}\n${line("B")}\n${line("R")}`, out = $("out");
@@ -909,6 +1083,87 @@ function startApp() {
     document.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", x === c));
     renderGrid();
   });
+
+  // ── 밴픽 브금: 유튜브 플레이어를 페이지에 넣어 재생한다 (이 브라우저에서만 들림) ──
+  let bgmList = [], ytPlayer = null, ytLoading = null, bgmCur = "";
+  const customBgm = () => { try { return JSON.parse(localStorage.getItem("banpick-bgm") || "[]").filter(x => x && /^[\w-]{11}$/.test(x.id)); } catch (e) { return []; } };
+  const saveCustom = a => { try { localStorage.setItem("banpick-bgm", JSON.stringify(a)); } catch (e) {} };
+  const ytId = u => { const s = String(u).trim(), m = s.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(s) ? s : ""; };
+  function bgmMsg(text, id) {
+    $("bgmMsg").innerHTML = esc(text) + (id ? ` <a href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener">${esc(T("bgmOpen"))}</a>` : "");
+  }
+  function fillBgm() {
+    const sel = $("bgmSel"), keep = sel.value;
+    const opt = x => `<option value="${esc(x.id)}">${esc(x.t)}</option>`;
+    let html = "";
+    for (const [g, label] of [["lck", "LCK"], ["worlds", T("bgmWorlds")]]) {
+      const items = bgmList.filter(x => x.g === g).sort((a, b) => b.y - a.y);
+      if (items.length) html += `<optgroup label="${esc(label)}">` + items.map(x => opt({ id: x.id, t: `${x.y} · ${x.t}` })).join("") + `</optgroup>`;
+    }
+    const mine = customBgm();
+    if (mine.length) html += `<optgroup label="${esc(T("bgmCustom"))}">` + mine.map(opt).join("") + `</optgroup>`;
+    sel.innerHTML = html;
+    if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+  }
+  function loadYt() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (ytLoading) return ytLoading;
+    ytLoading = new Promise((res, rej) => {
+      const fail = () => { ytLoading = null; rej(new Error("yt")); };
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); res(); };
+      const s = document.createElement("script");
+      s.src = "https://www.youtube.com/iframe_api"; s.onerror = fail;
+      document.head.appendChild(s);
+      setTimeout(() => { if (!(window.YT && window.YT.Player)) fail(); }, 10000);
+    });
+    return ytLoading;
+  }
+  async function bgmPlay() {
+    const id = $("bgmSel").value; if (!id) return;
+    bgmMsg("");
+    try { await loadYt(); } catch (e) { return bgmMsg(T("bgmErrLoad")); }
+    const vol = Number($("bgmVol").value);
+    if (!ytPlayer) {
+      bgmCur = id;
+      ytPlayer = new YT.Player("ytp", { width: 240, height: 135, videoId: id, playerVars: { autoplay: 1, playsinline: 1, rel: 0 }, events: {
+        onReady: e => { e.target.setVolume(vol); e.target.playVideo(); },
+        onStateChange: e => { if (e.data === 0 && $("bgmLoop").checked) { e.target.seekTo(0); e.target.playVideo(); } }, // 끝나면 처음부터
+        onError: e => bgmMsg(T(e.data === 101 || e.data === 150 ? "bgmErrEmbed" : "bgmErrGone"), bgmCur),
+      } });
+    } else if (typeof ytPlayer.loadVideoById === "function") {
+      if (bgmCur !== id) { bgmCur = id; ytPlayer.loadVideoById(id); } else ytPlayer.playVideo();
+      ytPlayer.setVolume(vol);
+    }
+  }
+  const bgmStop = () => { if (ytPlayer && typeof ytPlayer.pauseVideo === "function") ytPlayer.pauseVideo(); };
+  $("bgmPlay").onclick = bgmPlay;
+  $("bgmStop").onclick = bgmStop;
+  $("bgmSel").onchange = () => { if (ytPlayer && typeof ytPlayer.getPlayerState === "function" && ytPlayer.getPlayerState() === 1) bgmPlay(); };
+  $("bgmVol").oninput = e => { if (ytPlayer && typeof ytPlayer.setVolume === "function") ytPlayer.setVolume(Number(e.target.value)); };
+  $("bgmAdd").onclick = () => {
+    const id = ytId($("bgmUrl").value);
+    if (!id) return bgmMsg(T("bgmBadUrl"));
+    const a = customBgm().filter(x => x.id !== id);
+    a.push({ id, t: $("bgmName").value.trim().slice(0, 40) || id });
+    saveCustom(a); $("bgmUrl").value = $("bgmName").value = ""; bgmMsg("");
+    fillBgm(); $("bgmSel").value = id;
+  };
+  $("bgmDel").onclick = () => {
+    const id = $("bgmSel").value, a = customBgm();
+    if (!a.some(x => x.id === id) || bgmList.some(x => x.id === id)) return bgmMsg(T("bgmOnlyCustom"));
+    saveCustom(a.filter(x => x.id !== id)); bgmMsg(""); fillBgm();
+  };
+  fetch("/api/bgm").then(r => r.json()).then(a => { bgmList = Array.isArray(a) ? a : []; fillBgm(); }).catch(() => fillBgm());
+  let lastStatus = "";
+  function bgmAuto() { // 드래프트가 시작되면 재생, 끝나면 정지 (옵션을 켰을 때만)
+    const now = S.status;
+    if ($("bgmAuto").checked && now !== lastStatus) {
+      if (now === "live" && lastStatus !== "stopped") bgmPlay();
+      else if (now === "done" || now === "lobby" || now === "setup") bgmStop();
+    }
+    lastStatus = now;
+  }
 
   // ── 챔피언 목록: 서버가 모든 언어의 이름을 함께 준다 ──
   function buildChamps() {
@@ -946,13 +1201,13 @@ function startApp() {
       connected = true;
       S = m.s; role = m.role; online = m.online; keys = m.keys || null; pubBase = m.base || "";
       deadlineAt = performance.now() + (S.remain || 0);
-      render();
+      render(); bgmAuto();
     };
     ws.onclose = () => { connected = false; if (refused) return; if (S) render(); setTimeout(connect, 1500); };
     ws.onerror = () => {};
   }
   onLang = () => { // 언어 변경: 챔피언 이름과 모든 문구를 다시 그림
-    buildChamps(); applyCast();
+    buildChamps(); applyCast(); fillBgm();
     if (S) render(); else { renderGrid(); if (refused) showRefused(); else { $("turn").textContent = $("confirm").textContent = T("connecting"); } }
   };
   $("turn").textContent = $("confirm").textContent = T("connecting");

@@ -8,7 +8,9 @@ One person runs the program, sends an invite link to each captain, and both capt
 - Tournament draft order: 3 bans, 3 picks, 2 bans, 2 picks per team (20 steps)
 - Per-turn time limit with a bar that shrinks from both edges to the centre
 - If a team runs out of time the match is **stopped** (no auto-pick); the host resumes or restarts
+- **First Selection** (the rule pro leagues adopted in 2026): one team chooses either a side or the pick order, the other team decides the rest
 - Fearless mode, best-of-3 / best-of-5 series with a set score
+- Draft music: LCK and Worlds champ-select tracks by year, played through YouTube
 - Broadcast-style bar at the bottom, plus a transparent broadcast-only view for OBS
 - Interface in Korean, English, Japanese, Simplified Chinese and Russian
 - Server addresses are never shown on screen; invite links are copied with a button
@@ -38,11 +40,14 @@ Invite links then use a temporary `trycloudflare.com` address, which also keeps 
 | Role | Can do |
 |---|---|
 | Host (created the room) | Start, resume, undo, record the set winner, swap sides, change options, choose on any turn |
-| Captain | Choose on their own team's turns, rename their team, enter player names |
+| Captain | Use First Selection (side or pick order), choose on their own team's turns, rename their team, enter player names |
 | Broadcast view | View only |
 
 - There is no spectator link. Spectators watch through screen sharing; connections without a key are refused.
 - The captain links contain the server address. Send them privately.
+- Creating a room only asks for the two team names. Before each game the team holding **First Selection** chooses **either** a side (blue/red) **or** the pick order (first/second), and the other team decides what is left. First Selection is random for game 1 (the host can hand it to the other team) and goes to the loser of the previous game afterwards. The first-pick team bans and picks first, on either side.
+- A selected champion is previewed for everyone and the edge of its slot blinks until it is locked in.
+- **Draft music** (bottom of the page) plays in your own browser only; share audio when screen sharing. Add any YouTube link, or edit `bgm.json` next to the program (`bgm.js` in the source). Listed videos are third-party uploads and may be removed or block embedding. No audio is included in this project; check the rights of each track before using it on a stream.
 - After each game the host presses "**(team) wins**": the score box fills and the next game starts. Reaching the required wins ends the series.
 - Room state lives in memory only. Restarting the server removes running rooms; idle rooms are removed after 12 hours.
 
@@ -83,6 +88,7 @@ Behind a reverse proxy, forward WebSocket upgrades on `/ws`.
 
 - `server.js` – HTTP + WebSocket server, draft rules, timers
 - `champions.js` – built-in champion list (fallback) and position table
+- `bgm.js` – default draft-music list (YouTube video IDs)
 - `public/index.html` – the whole interface, including translations
 - `test.js` – end-to-end check
 

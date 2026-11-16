@@ -14,6 +14,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { NAMES, ROLES, key } = require('./champions');
+const BGM_DEFAULT = require('./bgm');
 
 
 // ── 설정 ─────────────────────────────────────────────────────
@@ -36,14 +37,31 @@ const sysLocale = (() => { try { return Intl.DateTimeFormat().resolvedOptions().
 const KO = config.lang ? config.lang === 'ko' : /^ko/i.test(process.env.LANG || '') || /^ko/i.test(sysLocale);
 const L = (ko, en) => (KO ? ko : en);
 const PORT = Number(process.env.PORT) || Number(config.port) || 3000;
+// 밴픽 브금 목록: 같은 폴더에 bgm.json이 있으면 그것을, 없으면 내장 목록을 쓴다. 요청 때마다 읽으므로 고치면 바로 반영된다.
+const BGM_PATH = path.join(APP_DIR, 'bgm.json');
+try { if (process.pkg && !fs.existsSync(BGM_PATH)) fs.writeFileSync(BGM_PATH, JSON.stringify(BGM_DEFAULT, null, 2) + '\n'); } catch (e) {}
+function loadBgm() {
+  try {
+    if (fs.existsSync(BGM_PATH)) {
+      const a = JSON.parse(fs.readFileSync(BGM_PATH, 'utf8').replace(/^\uFEFF/, ''));
+      if (Array.isArray(a)) return a.filter(x => x && /^[\w-]{11}$/.test(x.id)).slice(0, 300)
+        .map(x => ({ g: x.g === 'worlds' ? 'worlds' : 'lck', y: Number(x.y) || 0, t: String(x.t || x.id).slice(0, 80), id: x.id }));
+    }
+  } catch (e) {}
+  return BGM_DEFAULT;
+}
 let publicBase = ''; // 초대 링크에 쓸 외부 주소 (예: http://203.0.113.5:3000)
 const ROOM_TTL = 12 * 60 * 60 * 1000; // 마지막 활동 후 12시간 지나면 방 삭제
 const MAX_ROOMS = 300;
 const MIN_SEC = 5, MAX_SEC = 180;
 
 // 토너먼트 드래프트 순서: 밴3-픽3-밴2-픽2
+// 아래 순서의 'B'는 "선픽 팀"을 뜻한다. 선픽이 레드 진영이면(s.first === 'R') 글자를 뒤집어 읽는다.
 const ORDER = 'Bb Rb Bb Rb Bb Rb Bp Rp Rp Bp Bp Rp Rb Bb Rb Bb Rp Bp Bp Rp'.split(' ')
   .map(s => ({ team: s[0], type: s[1] === 'b' ? 'ban' : 'pick' }));
+const other = t => (t === 'B' ? 'R' : 'B');
+const stepAt = (s, i) => { const o = ORDER[i]; return o && (s.first === 'R' ? { team: other(o.team), type: o.type } : o); };
+const coin = () => (Math.random() < 0.5 ? 'B' : 'R');
 
 // ── 챔피언 목록 ──────────────────────────────────────────────
 // 각 챔피언: { id, img, roles, names: { ko, en, ja, zh, ru } }. 화면 언어에 맞는 이름은 브라우저가 고른다.
@@ -101,7 +119,11 @@ function createRoom(o = {}) {
       hist: [], sel: '', used: [], setNo: 1,
       fearless: !!o.fearless, turnSec: clampSec(o.turnSec),
       nameB: clean(o.nameB, 16), nameR: clean(o.nameR, 16), // 비어 있으면 화면에서 각자 언어의 기본 이름으로 표시
-      status: 'lobby', // lobby | live | stopped | done
+      status: 'setup', // setup(진영·선후픽 정하기) | lobby | live | stopped | done
+      first: 'B', // 선픽인 진영
+      // 첫 번째 선택권(First Selection, 2026 시즌 도입): 선택권을 가진 chooser 팀이 '진영' 또는 '밴픽 순서' 중
+      // 한 가지만 고르고(stage 1), 상대 팀이 나머지를 정한다(stage 2). 1세트는 무작위, 이후는 직전 세트에서 진 팀이 chooser.
+      setup: { chooser: coin(), stage: 1, need: '', why: 'random' },
       deadline: 0, stopBy: '',
       players: { B: ['', '', '', '', ''], R: ['', '', '', '', ''] }, // 방송 화면에 표시할 선수 이름 (픽 순서대로)
       score: { B: 0, R: 0 }, // 시리즈 세트 스코어
@@ -143,16 +165,29 @@ function arm(room) {
   room.timer = setTimeout(() => {
     if (s.status !== 'live' || s.hist.length >= ORDER.length) return;
     // 제한 시간 초과: 자동 선택 없이 경기 중단
-    s.status = 'stopped'; s.stopBy = ORDER[s.hist.length].team; s.sel = ''; s.deadline = 0;
+    s.status = 'stopped'; s.stopBy = stepAt(s, s.hist.length).team; s.sel = ''; s.deadline = 0;
     broadcast(room);
   }, s.turnSec * 1000);
 }
 
 const available = (s, id) => champIds.has(id) && !s.hist.includes(id) && !(s.fearless && s.used.includes(id));
 
+// 진영 교체: 팀 이름·선수·스코어·주장 링크·선픽 여부·선택권이 모두 팀을 따라 반대편으로 이동
+function swapSides(room) {
+  const s = room.s;
+  [s.nameB, s.nameR] = [s.nameR, s.nameB];
+  s.players = { B: s.players.R, R: s.players.B };
+  s.score = { B: s.score.R, R: s.score.B };
+  s.seriesWinner = s.seriesWinner ? other(s.seriesWinner) : '';
+  s.first = other(s.first);
+  if (s.setup) s.setup.chooser = other(s.setup.chooser);
+  [room.keys.B, room.keys.R] = [room.keys.R, room.keys.B];
+  for (const c of room.clients) c.role = c.role === 'B' ? 'R' : c.role === 'R' ? 'B' : c.role;
+}
+
 function handle(room, role, m) {
   const s = room.s, admin = role === 'admin';
-  const step = ORDER[s.hist.length];
+  const step = stepAt(s, s.hist.length);
   const myTurn = s.status === 'live' && step && (admin || role === step.team);
 
   switch (m.t) {
@@ -184,9 +219,35 @@ function handle(room, role, m) {
       if (!admin || !s.hist.length) return;
       s.hist.pop(); s.sel = ''; s.status = 'live'; s.stopBy = ''; arm(room);
       break;
-    case 'restart': // 이번 세트 다시
+    case 'restart': // 이번 세트 다시 (정해 둔 진영·선후픽은 유지)
       if (!admin) return;
-      s.hist = []; s.sel = ''; s.status = 'lobby'; s.stopBy = ''; disarm(room);
+      s.hist = []; s.sel = ''; s.status = s.setup ? 'setup' : 'lobby'; s.stopBy = ''; disarm(room);
+      break;
+    case 'choose': { // 진영 또는 선후픽 선택. pick: 'B' | 'R' | 'first' | 'second'
+      const st = s.setup;
+      if (s.status !== 'setup' || !st) return;
+      const actor = st.stage === 1 ? st.chooser : other(st.chooser);
+      if (!admin && role !== actor) return;
+      const kind = m.pick === 'B' || m.pick === 'R' ? 'side' : m.pick === 'first' || m.pick === 'second' ? 'order' : '';
+      if (!kind || (st.stage === 2 && kind !== st.need)) return;
+      if (kind === 'side') { if (m.pick !== actor) swapSides(room); }
+      else s.first = m.pick === 'first' ? actor : other(actor);
+      if (st.stage === 1) { st.stage = 2; st.need = kind === 'side' ? 'order' : 'side'; }
+      else { s.setup = null; s.status = 'lobby'; }
+      break;
+    }
+    case 'giveFirst': // 진행자: 첫 번째 선택권을 상대 팀에게 넘김 (가위바위보 등으로 따로 정했을 때)
+      if (!admin || s.status !== 'setup' || !s.setup || s.setup.stage !== 1) return;
+      s.setup.chooser = other(s.setup.chooser); s.setup.why = 'host';
+      break;
+    case 'random': // 진행자: 진영과 선후픽을 모두 무작위로
+      if (!admin || s.status !== 'setup') return;
+      if (coin() === 'R') swapSides(room);
+      s.first = coin(); s.setup = null; s.status = 'lobby';
+      break;
+    case 'flipFirst': // 진행자: 선후픽만 맞바꿈
+      if (!admin || s.status === 'live' || s.hist.length) return;
+      s.first = other(s.first);
       break;
     case 'win': { // 세트 승리 팀 기록 → 스코어 +1, 시리즈가 안 끝났으면 다음 세트로
       const t = m.team;
@@ -194,23 +255,19 @@ function handle(room, role, m) {
       s.score[t] = Math.min(s.winsNeeded, s.score[t] + 1);
       if (s.score[t] >= s.winsNeeded) { s.seriesWinner = t; break; } // 마지막 세트 밴픽은 화면에 남겨 둔다
       ORDER.forEach((o, i) => { const id = s.hist[i]; if (o.type === 'pick' && id && !s.used.includes(id)) s.used.push(id); });
-      s.hist = []; s.sel = ''; s.setNo++; s.status = 'lobby'; disarm(room);
+      s.hist = []; s.sel = ''; s.setNo++; disarm(room);
+      s.status = 'setup'; s.setup = { chooser: other(t), stage: 1, need: '', why: 'loser' }; // 진 팀이 먼저 고른다
       break;
     }
     case 'wipe': // 시리즈 전체 초기화
       if (!admin) return;
-      s.hist = []; s.sel = ''; s.used = []; s.setNo = 1; s.status = 'lobby'; s.stopBy = ''; s.score = { B: 0, R: 0 }; s.seriesWinner = ''; disarm(room);
+      s.hist = []; s.sel = ''; s.used = []; s.setNo = 1; s.stopBy = ''; s.score = { B: 0, R: 0 }; s.seriesWinner = ''; disarm(room);
+      s.status = 'setup'; s.setup = { chooser: coin(), stage: 1, need: '', why: 'random' };
       break;
-    case 'swap': { // 진영 교체: 팀 이름과 주장 링크가 함께 반대편으로 이동
+    case 'swap': // 진행자: 진영 교체
       if (!admin || s.status === 'live') return;
-      [s.nameB, s.nameR] = [s.nameR, s.nameB];
-      s.players = { B: s.players.R, R: s.players.B };
-      s.score = { B: s.score.R, R: s.score.B };
-      s.seriesWinner = s.seriesWinner === 'B' ? 'R' : s.seriesWinner === 'R' ? 'B' : '';
-      [room.keys.B, room.keys.R] = [room.keys.R, room.keys.B];
-      for (const c of room.clients) c.role = c.role === 'B' ? 'R' : c.role === 'R' ? 'B' : c.role;
+      swapSides(room);
       break;
-    }
     case 'opts': {
       if (m.nameB !== undefined && (admin || role === 'B')) s.nameB = clean(m.nameB, 16);
       if (m.nameR !== undefined && (admin || role === 'R')) s.nameR = clean(m.nameR, 16);
@@ -252,6 +309,8 @@ const server = http.createServer((req, res) => {
     });
   } else if (req.method === 'GET' && url.pathname === '/api/champions') {
     sendJson(res, 200, champs);
+  } else if (req.method === 'GET' && url.pathname === '/api/bgm') {
+    sendJson(res, 200, loadBgm());
   } else if (req.method === 'POST' && url.pathname === '/api/rooms') {
     let body = '';
     req.on('data', d => { body += d; if (body.length > 2048) req.destroy(); });
