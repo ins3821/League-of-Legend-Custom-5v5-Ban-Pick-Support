@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoL 5v5 Ban/Pick</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 좌(블루) · 중앙(챔피언 풀) · 우(레드) 3단. 맨 위는 양끝에서 가운데로 줄어드는 시간 바. 단일 다크 테마. */
+:root{
+  color-scheme: dark;
+  --bg:#0c1118;
+  --panel:#141b26;
+  --panel-2:#1b2433;
+  --line:#2a3547;
+  --text:#e8edf5;
+  --muted:#8693a8;
+  --blue:#3d9bff;
+  --blue-dim:#16304f;
+  --red:#ff5c62;
+  --red-dim:#4a1d24;
+  --turn:#f2c14e;
+  --display:"Black Han Sans","IBM Plex Sans KR",sans-serif;
+  --body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+/* 언어별 글꼴: 한글 글꼴에 없는 글자가 섞여 보이지 않도록 각 언어의 시스템 글꼴을 쓴다 */
+html[lang=en]{--body:"IBM Plex Sans KR","Segoe UI",system-ui,sans-serif}
+html[lang=ja]{--body:"Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;--display:var(--body)}
+html[lang=zh-CN]{--body:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--display:var(--body)}
+html[lang=ru]{--body:"Segoe UI","Helvetica Neue",system-ui,sans-serif;--display:var(--body)}
+html:is([lang=ja],[lang=zh-CN],[lang=ru]) :is(.team-name,.status .turn,.stop-box h2,.create h1,.cm-name,.cm-timer,.pick .no,.setno,.cpick .cno,.sgroup b){font-weight:700}
+.team-name::placeholder{color:inherit;opacity:1}
+.langsel{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px}
+.field .langsel{background:var(--bg);padding:9px 10px;color:var(--text)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;line-height:1.4;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--turn);outline-offset:2px}
+
+/* 방 만들기 */
+.create{margin:auto;width:100%;max-width:420px;padding:16px}
+.create form{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.create h1{margin:0;font-family:var(--display);font-weight:400;font-size:34px}
+.create h1 span:first-child{color:var(--blue)} .create h1 span:last-child{color:var(--red)}
+.create p{margin:0;color:var(--muted);font-size:13px}
+.create .join{margin-top:12px}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.field input[type=text],.field select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 10px;color:var(--text)}
+.err{color:var(--red);font-size:13px;min-height:18px}
+
+/* 시간 바: 가운데 고정, 양끝이 안쪽으로 줄어든다 */
+.timebar{height:10px;background:var(--panel-2);overflow:hidden;flex:none}
+.timebar i{display:block;height:100%;width:100%;transform-origin:center;transform:scaleX(0);background:var(--muted);transition:transform .1s linear}
+.timebar i.B{background:var(--blue)} .timebar i.R{background:var(--red)}
+.timebar i.low{background:var(--turn)}
+@media (prefers-reduced-motion:reduce){.timebar i{transition:none}}
+
+/* 상단 */
+.top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.team{display:flex;flex-direction:column;gap:2px;min-width:0}
+.team.R{align-items:flex-end}
+.team-name{background:transparent;border:0;border-bottom:2px solid transparent;font-family:var(--display);font-size:26px;letter-spacing:.02em;width:100%;min-width:0;padding:2px 0}
+.team-name:not([readonly]):hover,.team-name:not([readonly]):focus{border-bottom-color:currentColor;outline:0}
+#nameB{color:var(--blue)}
+#nameR{color:var(--red);text-align:right}
+.cap{font-size:12px;color:var(--muted)}
+.cap.on{color:var(--text)}
+.cap.me{color:var(--turn);font-weight:600}
+.status{text-align:center;min-width:200px}
+.status .phase{font-size:12px;color:var(--muted);letter-spacing:.08em}
+.status .turn{font-family:var(--display);font-size:22px;white-space:nowrap}
+.status .turn.B{color:var(--blue)} .status .turn.R{color:var(--red)} .status .turn.done{color:var(--turn)}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;color:var(--muted);min-height:21px}
+.timer.low{color:var(--turn)}
+
+/* 진행 띠: 20칸 */
+.track{display:grid;grid-template-columns:repeat(20,1fr);gap:3px;padding:8px 16px;background:var(--panel);flex:none}
+.track i{height:6px;border-radius:2px;background:var(--line)}
+.track i.B.done{background:var(--blue)} .track i.R.done{background:var(--red)}
+.track i.now{background:var(--turn)}
+.track i.t-pick{height:10px;margin-top:-2px}
+.track i.gap{margin-right:6px}
+
+/* 본문 */
+.main{flex:1;min-height:300px;display:grid;grid-template-columns:minmax(180px,240px) 1fr minmax(180px,240px);gap:12px;padding:12px 16px}
+.side{display:flex;flex-direction:column;gap:8px;min-height:0}
+.side h2{margin:0;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.08em}
+.bans{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.ban{position:relative;aspect-ratio:1;border:1px dashed var(--line);border-radius:4px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;line-height:1.15;padding:2px;color:var(--muted);overflow:hidden;overflow-wrap:anywhere;word-break:keep-all}
+.ban.filled{border-style:solid;background:var(--panel-2);color:var(--text)}
+.ban.none{border-style:solid}
+.ban img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.7)}
+.ban.filled::after{content:"";position:absolute;left:-10%;right:-10%;top:50%;height:2px;background:var(--red);transform:rotate(-45deg)}
+.ban.preview img{filter:none;opacity:.6}
+.picks{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0}
+.pick{flex:1;min-height:48px;max-height:84px;border:1px solid var(--line);border-radius:6px;background:var(--panel);display:flex;align-items:center;gap:10px;padding:0 10px;overflow:hidden}
+.side.R .pick{flex-direction:row-reverse;text-align:right}
+.pick .no{font-family:var(--display);font-size:18px;color:var(--line);flex:none}
+.pick img{height:calc(100% - 10px);max-height:64px;aspect-ratio:1;border-radius:4px;object-fit:cover;flex:none}
+.pick.preview img{opacity:.55}
+.pick .nm{font-size:16px;font-weight:600;word-break:keep-all;min-width:0}
+.side.B .pick.filled{background:var(--blue-dim);border-color:var(--blue)}
+.side.R .pick.filled{background:var(--red-dim);border-color:var(--red)}
+.side.B .pick.filled .no{color:var(--blue)} .side.R .pick.filled .no{color:var(--red)}
+.now{border-color:var(--turn)!important;border-style:solid!important;box-shadow:0 0 0 1px var(--turn) inset}
+.now .nm,.ban.now{color:var(--turn)}
+@media (prefers-reduced-motion:no-preference){.now{animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{50%{box-shadow:0 0 0 1px transparent inset}}
+
+.pool{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
+.tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#q{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600}
+.grid{flex:1;min-height:180px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));grid-auto-rows:min-content;gap:6px;align-content:start;border-top:1px solid var(--line);padding:8px 2px 2px}
+.grid.noimg{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.champ{background:var(--panel-2);border:1px solid transparent;border-radius:5px;padding:4px;font-size:12px;font-weight:500;word-break:keep-all;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:44px;justify-content:center}
+.champ img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:3px;display:block;background:var(--bg)}
+.champ:hover:not(:disabled){border-color:var(--muted)}
+.champ.sel{border-color:var(--turn);background:#3a3115;color:var(--turn)}
+.champ:disabled{cursor:not-allowed}
+.champ.banned,.champ.pB,.champ.pR,.champ.used{background:transparent;border-color:var(--line);color:var(--muted)}
+.champ.banned img,.champ.used img{filter:grayscale(1) brightness(.45)}
+.champ.pB img,.champ.pR img{filter:brightness(.45)}
+.champ.banned span{text-decoration:line-through}
+.champ.pB{color:var(--blue);border-color:var(--blue-dim)} .champ.pR{color:var(--red);border-color:var(--red-dim)}
+.champ.used span{font-style:italic}
+.empty{grid-column:1/-1;color:var(--muted);padding:16px 4px}
+
+/* 하단 */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid var(--line);background:var(--panel);flex:none}
+.btn{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:9px 14px}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--turn);border-color:var(--turn);color:#1a1405;font-weight:700;min-width:150px}
+.btn.small{padding:5px 10px;font-size:12px}
+.spacer{flex:1}
+.btn.win.B:not(:disabled){border-color:var(--blue);color:var(--blue)} .btn.win.R:not(:disabled){border-color:var(--red);color:var(--red)}
+.admin{display:contents}
+.opt{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.opt input{accent-color:var(--turn);width:16px;height:16px}
+.opt select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px}
+.setno{font-family:var(--display);font-size:16px;color:var(--muted)}
+.net{width:100%;font-size:12px;color:var(--muted)}
+.net b{color:var(--text);font-weight:600}
+.net .warn{color:var(--turn)}
+#out{display:none;width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;white-space:pre-wrap;font-size:13px;user-select:all}
+#out.show{display:block}
+
+/* 초대 링크 */
+.links{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}
+.links summary{cursor:pointer;font-weight:600}
+.links .rows{display:grid;grid-template-columns:auto auto;justify-content:start;gap:6px 14px;align-items:center;margin-top:8px}
+.links .lb{font-weight:600;white-space:nowrap}
+.links .lb.B{color:var(--blue)} .links .lb.R{color:var(--red)}
+.links input{background:transparent;border:0;color:var(--muted);min-width:0;width:100%;font-size:12px}
+.links .hint{grid-column:1/-1;color:var(--muted);font-size:12px}
+
+/* 경기 중단 */
+.stop{position:fixed;inset:0;background:rgba(6,9,14,.82);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.stop.show{display:flex}
+.stop-box{background:var(--panel);border:2px solid var(--red);border-radius:10px;padding:28px 32px;max-width:460px;width:100%;text-align:center;display:flex;flex-direction:column;gap:12px}
+.stop-box h2{margin:0;font-family:var(--display);font-weight:400;font-size:44px;color:var(--red);letter-spacing:.04em}
+.stop-box p{margin:0;font-size:16px;word-break:keep-all}
+.stop-box .sub{font-size:13px;color:var(--muted)}
+.stop-box .acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+
+
+/* ── 방송 화면: 화면 아래 가로 띠. 위는 밴과 시리즈 밴, 아래는 픽 5 · 가운데 정보 · 픽 5 ── */
+.cast{flex:none;background:#06090e;border-top:2px solid var(--line)}
+.nocast .cast{display:none}
+.cast-time{height:4px;background:var(--panel-2);overflow:hidden}
+.cast-time i{display:block;height:100%;transform-origin:center;transform:scaleX(0);background:var(--muted);transition:transform .1s linear}
+.cast-time i.B{background:var(--blue)} .cast-time i.R{background:var(--red)} .cast-time i.low{background:var(--turn)}
+.cast-scroll{overflow-x:auto}
+.cast-in{min-width:980px}
+.cast-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;padding:6px 10px}
+.cbans{display:flex;gap:4px}
+.cbans.R{flex-direction:row-reverse}
+.cban{position:relative;width:44px;height:44px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:3px;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;font-size:9px;line-height:1.1;color:var(--muted);word-break:keep-all}
+.cbans.B .cban{border-bottom:2px solid var(--blue)} .cbans.R .cban{border-bottom:2px solid var(--red)}
+.cban img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(.6) brightness(.75)}
+.cban::after{content:"";position:absolute;left:-10%;right:-10%;top:50%;height:2px;background:rgba(255,255,255,.75);transform:rotate(45deg)}
+.cban.now{border-color:var(--turn);box-shadow:0 0 0 1px var(--turn) inset}
+.cban.now::after{display:none}
+.cban.now img{filter:none;opacity:.7}
+.cseries{display:flex;align-items:center;gap:12px;min-height:44px}
+.cseries .lb{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted)}
+.sgroup{display:flex;align-items:center;gap:4px}
+.sgroup b{font-family:var(--display);font-weight:400;font-size:13px;color:var(--muted)}
+.sgroup .ic{display:grid;grid-template-columns:repeat(5,20px);gap:2px}
+.sgroup .ic span{width:20px;height:20px;background:var(--panel-2);border-radius:2px;overflow:hidden;font-size:0}
+.sgroup .ic img{width:100%;height:100%;object-fit:cover;filter:grayscale(.5)}
+.sgroup .ic span.txt{font-size:8px;line-height:20px;text-align:center;color:var(--muted)}
+.cast-main{display:grid;grid-template-columns:5fr minmax(250px,2.2fr) 5fr;height:190px;gap:2px}
+.cteam{display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+.cpick{position:relative;overflow:hidden;background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.cteam.B .cpick{border-top:3px solid var(--blue-dim)} .cteam.R .cpick{border-top:3px solid var(--red-dim)}
+.cteam.B .cpick.filled{border-top-color:var(--blue)} .cteam.R .cpick.filled{border-top-color:var(--red)}
+.cpick img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.cpick.preview img{opacity:.45}
+.cpick.now{box-shadow:0 0 0 2px var(--turn) inset}
+.cpick .cno{position:absolute;top:6px;left:8px;font-family:var(--display);font-size:15px;color:rgba(255,255,255,.35)}
+.cteam.R .cpick .cno{left:auto;right:8px}
+.cpick .cchamp{position:absolute;left:0;right:0;top:38%;text-align:center;font-weight:600;font-size:14px;padding:0 4px;word-break:keep-all}
+.cpick.hasimg .cchamp{top:auto;bottom:30px;font-size:12px;text-shadow:0 1px 3px #000}
+.cpick.now:not(.preview) .cchamp{color:var(--turn)}
+.cpick .cplayer{position:absolute;left:0;right:0;bottom:0;width:100%;height:28px;border:0;background:linear-gradient(180deg,rgba(6,9,14,.55),rgba(6,9,14,.92));text-align:center;font-weight:700;font-size:13px;letter-spacing:.04em;padding:0 4px;color:var(--text)}
+.cpick .cplayer::placeholder{color:rgba(255,255,255,.3);font-weight:400}
+.cpick .cplayer[readonly]{pointer-events:none}
+.cpick .cplayer[readonly]::placeholder{color:transparent}
+.cmid{display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:1fr auto;background:#000;padding:10px 8px 6px;gap:4px 6px;text-align:center}
+.cm-side{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0}
+.pips{display:flex;gap:4px}
+.pips button{width:26px;height:13px;border:2px solid var(--text);background:transparent;padding:0;border-radius:0}
+.pips button.on{background:var(--text)}
+.pips button:disabled{cursor:default;opacity:1}
+.cm-lbl{font-size:11px;font-weight:700;letter-spacing:.14em}
+.cm-side.B .cm-lbl{color:var(--blue)} .cm-side.R .cm-lbl{color:var(--red)}
+.cm-name{font-family:var(--display);font-size:22px;line-height:1.1;word-break:keep-all;overflow-wrap:anywhere}
+.cm-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:44px}
+.cm-arrow{font-size:22px;line-height:1;color:var(--turn);min-height:22px}
+.cm-timer{font-family:var(--display);font-size:24px;font-variant-numeric:tabular-nums;min-height:28px}
+.cm-timer.low{color:var(--turn)} .cm-timer.stop{color:var(--red);font-size:16px}
+.cm-foot{grid-column:1/-1;font-size:11px;color:var(--muted);letter-spacing:.06em}
+/* 방송 전용 보기 (?view=cast): 띠만 남기고 배경은 투명 */
+body.castonly{background:transparent}
+body.castonly .timebar,body.castonly .top,body.castonly .track,body.castonly .main,body.castonly .bar,body.castonly .stop{display:none!important}
+body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
+
+@media (max-width:760px){
+  html,body{height:auto}
+  .top{grid-template-columns:1fr 1fr}
+  .status{grid-column:1/-1;order:-1}
+  .team-name{font-size:20px}
+  .main{grid-template-columns:1fr 1fr}
+  .pool{grid-column:1/-1;order:3}
+  .grid{max-height:60vh}
+  .pick{min-height:40px;padding:0 6px;gap:6px} .pick .nm{font-size:13px} .pick .no{font-size:14px}
+  .links .rows{grid-template-columns:1fr auto;justify-content:stretch}
+  .stop-box h2{font-size:34px}
+}
+</style>
+</head>
+<body>
+
+<!-- 방 만들기 (주소에 room이 없을 때) -->
+<section class="create" id="create" hidden>
+  <form id="createForm">
+    <h1><span data-i18n="wBan"></span><span data-i18n="wPick"></span></h1>
+    <label class="field"><span data-i18n="lblLang"></span><select class="langsel" aria-label="Language"></select></label>
+    <p data-i18n="createDesc"></p>
+    <label class="field"><span data-i18n="lblNameB"></span><input type="text" id="cNameB" maxlength="16" data-i18n-ph="blueTeam"></label>
+    <label class="field"><span data-i18n="lblNameR"></span><input type="text" id="cNameR" maxlength="16" data-i18n-ph="redTeam"></label>
+    <label class="field"><span data-i18n="lblTurnSec"></span>
+      <select id="cSec" class="secs"><option value="20"></option><option value="30" selected></option><option value="45"></option><option value="60"></option></select>
+    </label>
+    <label class="field"><span data-i18n="lblSeries"></span>
+      <select id="cBo"><option value="3" selected data-i18n="bo3"></option><option value="5" data-i18n="bo5"></option></select>
+    </label>
+    <label class="opt"><input type="checkbox" id="cFearless"> <span data-i18n="fearlessLong"></span></label>
+    <div class="err" id="cErr" role="alert"></div>
+    <button class="btn primary" type="submit" data-i18n="btnCreate"></button>
+  </form>
+</section>
+
+<!-- 밴픽 화면 -->
+<div id="app" hidden style="display:contents">
+<div class="timebar" aria-hidden="true"><i id="tbar"></i></div>
+<header class="top">
+  <div class="team B">
+    <input class="team-name" id="nameB" maxlength="16" data-i18n-ph="blueTeam" data-i18n-aria="lblNameB" readonly>
+    <span class="cap" id="capB"></span>
+  </div>
+  <div class="status">
+    <div class="phase" id="phase"></div>
+    <div class="turn" id="turn"></div>
+    <div class="timer" id="timer"></div>
+  </div>
+  <div class="team R">
+    <input class="team-name" id="nameR" maxlength="16" data-i18n-ph="redTeam" data-i18n-aria="lblNameR" readonly>
+    <span class="cap" id="capR"></span>
+  </div>
+</header>
+<div class="track" id="track" aria-hidden="true"></div>
+
+<main class="main">
+  <section class="side B" data-i18n-aria="blueTeam">
+    <h2 data-i18n="bans"></h2><div class="bans" id="bansB"></div>
+    <h2 data-i18n="picks"></h2><div class="picks" id="picksB"></div>
+  </section>
+
+  <section class="pool">
+    <div class="tools">
+      <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
+      <button class="chip" data-role="" aria-pressed="true" data-i18n="roleAll"></button>
+      <button class="chip" data-role="T" aria-pressed="false" data-i18n="roleT"></button>
+      <button class="chip" data-role="J" aria-pressed="false" data-i18n="roleJ"></button>
+      <button class="chip" data-role="M" aria-pressed="false" data-i18n="roleM"></button>
+      <button class="chip" data-role="A" aria-pressed="false" data-i18n="roleA"></button>
+      <button class="chip" data-role="S" aria-pressed="false" data-i18n="roleS"></button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section class="side R" data-i18n-aria="redTeam">
+    <h2 data-i18n="bans"></h2><div class="bans" id="bansR"></div>
+    <h2 data-i18n="picks"></h2><div class="picks" id="picksR"></div>
+  </section>
+</main>
+
+<footer class="bar">
+  <button class="btn primary" id="confirm" disabled></button>
+  <button class="btn" id="noban" disabled data-i18n="noBan"></button>
+  <span class="admin" id="adminA" hidden>
+    <button class="btn" id="undo" data-i18n="undo"></button>
+    <button class="btn" id="reset" data-i18n="restartSet"></button>
+  </span>
+  <span class="spacer"></span>
+  <span class="admin" id="adminB" hidden>
+    <label class="opt"><span data-i18n="lblLimit"></span>
+      <select id="optSec" class="secs"><option value="20"></option><option value="30"></option><option value="45"></option><option value="60"></option></select>
+    </label>
+    <label class="opt"><input type="checkbox" id="optFearless"> <span data-i18n="fearless"></span></label>
+    <label class="opt"><span data-i18n="series"></span>
+      <select id="optBo"><option value="3" data-i18n="bo3"></option><option value="5" data-i18n="bo5"></option></select>
+    </label>
+    <button class="btn win B" id="winB"></button>
+    <button class="btn win R" id="winR"></button>
+    <button class="btn" id="swap" data-i18n="swap"></button>
+    <button class="btn" id="wipe" data-i18n="wipe"></button>
+  </span>
+  <span class="setno" id="setno"></span>
+  <button class="btn" id="copy" data-i18n="copyResult"></button>
+  <button class="btn" id="castToggle"></button>
+  <label class="opt"><select class="langsel" aria-label="Language"></select></label>
+  <div class="net" id="net"></div>
+  <details class="links" id="links" hidden><summary data-i18n="links"></summary><div class="rows" id="linkRows"></div></details>
+  <div id="out"></div>
+</footer>
+
+<div class="stop" id="stop" role="alertdialog" aria-modal="true" aria-labelledby="stopTitle">
+  <div class="stop-box">
+    <h2 id="stopTitle" data-i18n="stopTitle"></h2>
+    <p id="stopMsg"></p>
+    <p class="sub" id="stopSub"></p>
+    <div class="acts" id="stopActs">
+      <button class="btn primary" id="resume" data-i18n="resume"></button>
+      <button class="btn" id="restart" data-i18n="restartSet"></button>
+    </div>
+  </div>
+</div>
+<section class="cast" id="cast">
+  <div class="cast-time" aria-hidden="true"><i id="ctbar"></i></div>
+  <div class="cast-scroll"><div class="cast-in">
+    <div class="cast-top">
+      <div class="cbans B" id="cbansB"></div>
+      <div class="cseries" id="cseries"></div>
+      <div class="cbans R" id="cbansR"></div>
+    </div>
+    <div class="cast-main">
+      <div class="cteam B" id="cpicksB"></div>
+      <div class="cmid">
+        <div class="cm-side B"><div class="pips" id="pipsB"></div><div class="cm-lbl" data-i18n="blueSide"></div><div class="cm-name" id="cmNameB"></div></div>
+        <div class="cm-center"><div class="cm-arrow" id="cmArrow"></div><div class="cm-timer" id="cmTimer"></div></div>
+        <div class="cm-side R"><div class="pips" id="pipsR"></div><div class="cm-lbl" data-i18n="redSide"></div><div class="cm-name" id="cmNameR"></div></div>
+        <div class="cm-foot" id="cmFoot"></div>
+      </div>
+      <div class="cteam R" id="cpicksR"></div>
+    </div>
+  </div></div>
+</section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const cho = s => [...s].map(c => { const k = c.charCodeAt(0) - 0xAC00; return k >= 0 && k < 11172 ? CHO[Math.floor(k / 588)] : c; }).join("");
+const norm = s => s.replace(/\s/g, "").toLowerCase();
+
+const ORDER = "Bb Rb Bb Rb Bb Rb Bp Rp Rp Bp Bp Rp Rb Bb Rb Bb Rp Bp Bp Rp".split(" ").map((s, i, arr) => {
+  const team = s[0], type = s[1] === "b" ? "ban" : "pick";
+  return { team, type, idx: arr.slice(0, i).filter(x => x === s).length };
+});
+const PHASE_ENDS = [6, 12, 16, 20];
+
+// ── 언어 ──────────────────────────────────────────────────────
+// 새 언어를 추가하려면 LANGS에 한 줄, I18N에 같은 키로 번역 한 벌을 넣으면 된다. 빠진 키는 영어로 표시된다.
+const LANGS = { ko: ["한국어", "ko"], en: ["English", "en"], ja: ["日本語", "ja"], zh: ["简体中文", "zh-CN"], ru: ["Русский", "ru"] };
+const I18N = {
+  ko: {
+    title: "롤 5대5 밴픽", wBan: "밴", wPick: "픽", createTitle: "방 만들기",
+    createDesc: "방을 만들면 블루 주장·레드 주장 초대 링크를 복사할 수 있습니다. 관전은 화면 공유로 진행하세요.",
+    lblNameB: "블루 팀 이름", lblNameR: "레드 팀 이름", lblTurnSec: "차례당 제한 시간", sec: "{n}초", lblSeries: "시리즈 방식",
+    bo3: "3판 2선승", bo5: "5판 3선승", fearlessLong: "피어리스 (이전 세트에서 고른 챔피언 재사용 금지)", btnCreate: "방 만들기",
+    errCreate: "방을 만들지 못했습니다.", errFull: "방이 너무 많습니다. 잠시 후 다시 시도해 주세요.", errServer: "서버에 연결하지 못했습니다.", lblLang: "언어",
+    connecting: "연결 중", blueTeam: "블루 팀", redTeam: "레드 팀", bans: "밴", picks: "픽", searchPh: "챔피언 검색 (초성 가능: ㅇㄹ → 아리)",
+    roleAll: "전체", roleT: "탑", roleJ: "정글", roleM: "미드", roleA: "원딜", roleS: "서폿",
+    noBan: "밴 없음", undo: "되돌리기", restartSet: "이번 세트 다시", lblLimit: "제한 시간", fearless: "피어리스", series: "시리즈",
+    winOf: "{team} 승리", swap: "진영 교체", wipe: "전체 초기화", copyResult: "결과 복사", castHide: "방송 화면 숨기기", castShow: "방송 화면 보기",
+    links: "초대 링크", stopTitle: "경기 중단", resume: "이 차례부터 재개", blueSide: "블루 진영", redSide: "레드 진영",
+    none: "없음", selecting: "선택 중", capMe: "내 팀 · 주장", capOn: "주장 접속 중", capOff: "주장 미접속",
+    phLobby: "{set}세트 · 제한 시간 {sec}초", waitStart: "시작 대기", seriesOver: "시리즈 종료 · {b} : {r}",
+    phDoneAdmin: "{set}세트 · 경기가 끝나면 승리 팀을 눌러 주세요", phDonePlay: "{set}세트 · 경기 진행 중", draftDone: "밴픽 완료",
+    phLive: "{set}세트 · {phase} · {n}/20", turnBan: "{team} 밴", turnPick: "{team} 픽",
+    phase1: "1차 밴", phase2: "1차 픽", phase3: "2차 밴", phase4: "2차 픽",
+    reconnecting: "재연결 중", startDraft: "드래프트 시작", waitHost: "진행자가 시작하면 진행됩니다", complete: "완료", stoppedBtn: "중단됨",
+    viewOnly: "보기 전용", oppTurn: "상대 차례", confirmBan: "{champ} 밴 확정", confirmPick: "{champ} 픽 확정",
+    chooseBan: "밴할 챔피언 선택", choosePick: "픽할 챔피언 선택", fearlessUsed: "피어리스 · 사용 {n}",
+    roleAdmin: "진행자 (모든 차례 대신 선택 가능)", roleB: "블루 주장", roleR: "레드 주장", roleCast: "방송 화면 (보기 전용)",
+    connected: "연결됨", disconnected: "연결이 끊겨 다시 연결하는 중입니다", myRole: "내 역할: {who}", noPortraits: "챔피언 초상화를 불러오지 못해 이름만 표시합니다",
+    stopMsgBan: "{team} 팀이 제한 시간 {sec}초 안에 밴을 하지 못했습니다.", stopMsgPick: "{team} 팀이 제한 시간 {sec}초 안에 픽을 하지 못했습니다.",
+    stopSub: "{set}세트 · {phase} · {n}/20 단계에서 중단", stopWait: "진행자가 재개할 때까지 기다려 주세요",
+    linkB: "블루 주장 초대 링크", linkR: "레드 주장 초대 링크", linkCast: "방송 전용 화면 (내 PC의 OBS용)", copyLink: "링크 복사",
+    linkHint: "주소는 화면에 표시하지 않습니다. 주장 링크는 해당 주장에게 개인 메시지로만 보내세요. 링크에는 서버 주소가 들어 있습니다.",
+    linkHintLocal: "지금은 외부 주소를 확인하지 못해 내부 주소로 복사됩니다.", copied: "복사됨", copyFail: "복사 실패",
+    loadingChamps: "챔피언 목록을 불러오는 중입니다.", noResults: "검색 결과가 없습니다.", tBanned: "밴됨", tUsed: "이전 세트에서 사용", tPicked: "픽됨", playerPh: "선수 이름",
+    setN: "{set}세트", seriesWin: "{team} 시리즈 승리", dataVer: "데이터 {v}", seriesBan: "시리즈 밴", noneYet: "아직 없음", timeOver: "시간 초과",
+    resTitle: "[{set}세트 밴픽]", resBlue: "블루", resRed: "레드",
+    denied: "들어올 수 없습니다", deniedSub: "진행자에게 받은 초대 링크로 접속해 주세요", noRoom: "없는 방입니다", noRoomSub: "방이 만료되었거나 주소가 잘못되었습니다", newRoom: "새 방 만들기",
+  },
+  en: {
+    title: "LoL 5v5 Ban/Pick", wBan: "Ban", wPick: "Pick", createTitle: "Create a room",
+    createDesc: "After creating a room you can copy invite links for the blue and red captains. Spectators watch through screen sharing.",
+    lblNameB: "Blue team name", lblNameR: "Red team name", lblTurnSec: "Time limit per turn", sec: "{n}s", lblSeries: "Series format",
+    bo3: "Best of 3", bo5: "Best of 5", fearlessLong: "Fearless (champions picked in earlier games cannot be picked again)", btnCreate: "Create room",
+    errCreate: "Could not create the room.", errFull: "Too many rooms right now. Try again shortly.", errServer: "Could not reach the server.", lblLang: "Language",
+    connecting: "Connecting", blueTeam: "Blue Team", redTeam: "Red Team", bans: "BANS", picks: "PICKS", searchPh: "Search champions",
+    roleAll: "All", roleT: "Top", roleJ: "Jungle", roleM: "Mid", roleA: "Bot", roleS: "Support",
+    noBan: "No ban", undo: "Undo", restartSet: "Restart this game", lblLimit: "Time limit", fearless: "Fearless", series: "Series",
+    winOf: "{team} wins", swap: "Swap sides", wipe: "Reset series", copyResult: "Copy result", castHide: "Hide broadcast bar", castShow: "Show broadcast bar",
+    links: "Invite links", stopTitle: "MATCH STOPPED", resume: "Resume from this turn", blueSide: "BLUE SIDE", redSide: "RED SIDE",
+    none: "None", selecting: "Choosing", capMe: "My team · Captain", capOn: "Captain connected", capOff: "Captain not connected",
+    phLobby: "Game {set} · {sec}s per turn", waitStart: "Waiting to start", seriesOver: "Series over · {b} : {r}",
+    phDoneAdmin: "Game {set} · When the game ends, press the winning team", phDonePlay: "Game {set} · Game in progress", draftDone: "Draft complete",
+    phLive: "Game {set} · {phase} · {n}/20", turnBan: "{team} ban", turnPick: "{team} pick",
+    phase1: "Ban phase 1", phase2: "Pick phase 1", phase3: "Ban phase 2", phase4: "Pick phase 2",
+    reconnecting: "Reconnecting", startDraft: "Start draft", waitHost: "Waiting for the host to start", complete: "Complete", stoppedBtn: "Stopped",
+    viewOnly: "View only", oppTurn: "Opponent's turn", confirmBan: "Lock in ban: {champ}", confirmPick: "Lock in pick: {champ}",
+    chooseBan: "Choose a champion to ban", choosePick: "Choose a champion to pick", fearlessUsed: "Fearless · {n} used",
+    roleAdmin: "Host (can choose on any turn)", roleB: "Blue captain", roleR: "Red captain", roleCast: "Broadcast view (view only)",
+    connected: "Connected", disconnected: "Connection lost, reconnecting", myRole: "My role: {who}", noPortraits: "Champion portraits could not be loaded, showing names only",
+    stopMsgBan: "{team} did not ban within the {sec}-second limit.", stopMsgPick: "{team} did not pick within the {sec}-second limit.",
+    stopSub: "Stopped at game {set} · {phase} · step {n}/20", stopWait: "Waiting for the host to resume",
+    linkB: "Blue captain invite link", linkR: "Red captain invite link", linkCast: "Broadcast-only view (for OBS on this PC)", copyLink: "Copy link",
+    linkHint: "Addresses are never shown on screen. Send each captain link only to that captain in a private message. The link contains the server address.",
+    linkHintLocal: "The public address could not be detected, so links are copied with the local address.", copied: "Copied", copyFail: "Copy failed",
+    loadingChamps: "Loading champions.", noResults: "No champions found.", tBanned: "Banned", tUsed: "Used in an earlier game", tPicked: "Picked", playerPh: "Player name",
+    setN: "Game {set}", seriesWin: "{team} wins the series", dataVer: "Data {v}", seriesBan: "SERIES BANS", noneYet: "None yet", timeOver: "Time over",
+    resTitle: "[Game {set} draft]", resBlue: "Blue", resRed: "Red",
+    denied: "Access denied", deniedSub: "Open the invite link you received from the host", noRoom: "Room not found", noRoomSub: "The room has expired or the address is wrong", newRoom: "Create a new room",
+  },
+  ja: {
+    title: "LoL 5対5 バン/ピック", wBan: "バン", wPick: "ピック", createTitle: "ルーム作成",
+    createDesc: "ルームを作成すると、ブルー・レッド各キャプテン用の招待リンクをコピーできます。観戦は画面共有で行ってください。",
+    lblNameB: "ブルーチーム名", lblNameR: "レッドチーム名", lblTurnSec: "1ターンの制限時間", sec: "{n}秒", lblSeries: "シリーズ形式",
+    bo3: "BO3（2本先取）", bo5: "BO5（3本先取）", fearlessLong: "フィアレス（前のゲームでピックしたチャンピオンは再使用不可）", btnCreate: "ルームを作成",
+    errCreate: "ルームを作成できませんでした。", errFull: "ルームが多すぎます。しばらくしてからお試しください。", errServer: "サーバーに接続できませんでした。", lblLang: "言語",
+    connecting: "接続中", blueTeam: "ブルーチーム", redTeam: "レッドチーム", bans: "バン", picks: "ピック", searchPh: "チャンピオンを検索",
+    roleAll: "すべて", roleT: "トップ", roleJ: "ジャングル", roleM: "ミッド", roleA: "ボット", roleS: "サポート",
+    noBan: "バンなし", undo: "元に戻す", restartSet: "このゲームをやり直す", lblLimit: "制限時間", fearless: "フィアレス", series: "シリーズ",
+    winOf: "{team} の勝利", swap: "サイド交代", wipe: "すべてリセット", copyResult: "結果をコピー", castHide: "配信画面を隠す", castShow: "配信画面を表示",
+    links: "招待リンク", stopTitle: "試合中断", resume: "このターンから再開", blueSide: "ブルーサイド", redSide: "レッドサイド",
+    none: "なし", selecting: "選択中", capMe: "自チーム · キャプテン", capOn: "キャプテン接続中", capOff: "キャプテン未接続",
+    phLobby: "第{set}ゲーム · 制限時間 {sec}秒", waitStart: "開始待ち", seriesOver: "シリーズ終了 · {b} : {r}",
+    phDoneAdmin: "第{set}ゲーム · 試合が終わったら勝利チームを押してください", phDonePlay: "第{set}ゲーム · 試合進行中", draftDone: "ドラフト完了",
+    phLive: "第{set}ゲーム · {phase} · {n}/20", turnBan: "{team} バン", turnPick: "{team} ピック",
+    phase1: "バンフェーズ1", phase2: "ピックフェーズ1", phase3: "バンフェーズ2", phase4: "ピックフェーズ2",
+    reconnecting: "再接続中", startDraft: "ドラフト開始", waitHost: "進行役の開始を待っています", complete: "完了", stoppedBtn: "中断中",
+    viewOnly: "閲覧専用", oppTurn: "相手のターン", confirmBan: "{champ} をバン確定", confirmPick: "{champ} をピック確定",
+    chooseBan: "バンするチャンピオンを選択", choosePick: "ピックするチャンピオンを選択", fearlessUsed: "フィアレス · 使用済み {n}",
+    roleAdmin: "進行役（すべてのターンで代理選択可）", roleB: "ブルーキャプテン", roleR: "レッドキャプテン", roleCast: "配信画面（閲覧専用）",
+    connected: "接続済み", disconnected: "接続が切れたため再接続しています", myRole: "自分の役割: {who}", noPortraits: "チャンピオン画像を読み込めないため名前のみ表示しています",
+    stopMsgBan: "{team} が制限時間 {sec}秒 以内にバンできませんでした。", stopMsgPick: "{team} が制限時間 {sec}秒 以内にピックできませんでした。",
+    stopSub: "第{set}ゲーム · {phase} · {n}/20 で中断", stopWait: "進行役が再開するまでお待ちください",
+    linkB: "ブルーキャプテン招待リンク", linkR: "レッドキャプテン招待リンク", linkCast: "配信専用画面（このPCのOBS用）", copyLink: "リンクをコピー",
+    linkHint: "アドレスは画面に表示されません。キャプテン用リンクは本人にだけ個別メッセージで送ってください。リンクにはサーバーのアドレスが含まれます。",
+    linkHintLocal: "外部アドレスを確認できなかったため、内部アドレスでコピーされます。", copied: "コピーしました", copyFail: "コピー失敗",
+    loadingChamps: "チャンピオン一覧を読み込み中です。", noResults: "該当するチャンピオンがありません。", tBanned: "バン済み", tUsed: "前のゲームで使用済み", tPicked: "ピック済み", playerPh: "選手名",
+    setN: "第{set}ゲーム", seriesWin: "{team} シリーズ勝利", dataVer: "データ {v}", seriesBan: "シリーズバン", noneYet: "まだなし", timeOver: "時間切れ",
+    resTitle: "[第{set}ゲーム ドラフト]", resBlue: "ブルー", resRed: "レッド",
+    denied: "入室できません", deniedSub: "進行役から受け取った招待リンクでアクセスしてください", noRoom: "ルームが見つかりません", noRoomSub: "ルームの期限が切れたか、アドレスが間違っています", newRoom: "新しいルームを作成",
+  },
+  zh: {
+    title: "英雄联盟 5v5 BP", wBan: "禁用", wPick: "选用", createTitle: "创建房间",
+    createDesc: "创建房间后，可以复制蓝色方和红色方队长的邀请链接。观众请通过屏幕共享观看。",
+    lblNameB: "蓝色方队名", lblNameR: "红色方队名", lblTurnSec: "每回合限时", sec: "{n}秒", lblSeries: "赛制",
+    bo3: "三局两胜", bo5: "五局三胜", fearlessLong: "无畏征召（之前对局选用过的英雄不能再次选用）", btnCreate: "创建房间",
+    errCreate: "无法创建房间。", errFull: "房间数量过多，请稍后再试。", errServer: "无法连接服务器。", lblLang: "语言",
+    connecting: "连接中", blueTeam: "蓝色方", redTeam: "红色方", bans: "禁用", picks: "选用", searchPh: "搜索英雄",
+    roleAll: "全部", roleT: "上路", roleJ: "打野", roleM: "中路", roleA: "下路", roleS: "辅助",
+    noBan: "不禁用", undo: "撤销", restartSet: "重新开始本局", lblLimit: "限时", fearless: "无畏征召", series: "赛制",
+    winOf: "{team} 获胜", swap: "交换阵营", wipe: "全部重置", copyResult: "复制结果", castHide: "隐藏转播画面", castShow: "显示转播画面",
+    links: "邀请链接", stopTitle: "比赛中止", resume: "从当前回合继续", blueSide: "蓝色方", redSide: "红色方",
+    none: "无", selecting: "选择中", capMe: "我方 · 队长", capOn: "队长已连接", capOff: "队长未连接",
+    phLobby: "第{set}局 · 限时 {sec}秒", waitStart: "等待开始", seriesOver: "系列赛结束 · {b} : {r}",
+    phDoneAdmin: "第{set}局 · 比赛结束后请点击获胜队伍", phDonePlay: "第{set}局 · 比赛进行中", draftDone: "BP 完成",
+    phLive: "第{set}局 · {phase} · {n}/20", turnBan: "{team} 禁用", turnPick: "{team} 选用",
+    phase1: "第一轮禁用", phase2: "第一轮选用", phase3: "第二轮禁用", phase4: "第二轮选用",
+    reconnecting: "重新连接中", startDraft: "开始 BP", waitHost: "等待主持人开始", complete: "完成", stoppedBtn: "已中止",
+    viewOnly: "仅查看", oppTurn: "对方回合", confirmBan: "确定禁用 {champ}", confirmPick: "确定选用 {champ}",
+    chooseBan: "请选择要禁用的英雄", choosePick: "请选择要选用的英雄", fearlessUsed: "无畏征召 · 已用 {n}",
+    roleAdmin: "主持人（可在任何回合代为选择）", roleB: "蓝色方队长", roleR: "红色方队长", roleCast: "转播画面（仅查看）",
+    connected: "已连接", disconnected: "连接已断开，正在重新连接", myRole: "我的身份：{who}", noPortraits: "无法加载英雄头像，仅显示名称",
+    stopMsgBan: "{team} 未能在 {sec} 秒限时内完成禁用。", stopMsgPick: "{team} 未能在 {sec} 秒限时内完成选用。",
+    stopSub: "第{set}局 · {phase} · 第 {n}/20 步中止", stopWait: "请等待主持人继续",
+    linkB: "蓝色方队长邀请链接", linkR: "红色方队长邀请链接", linkCast: "转播专用画面（用于本机 OBS）", copyLink: "复制链接",
+    linkHint: "地址不会显示在屏幕上。队长链接请只通过私信发给对应的队长。链接中包含服务器地址。",
+    linkHintLocal: "未能检测到外网地址，链接将使用内网地址。", copied: "已复制", copyFail: "复制失败",
+    loadingChamps: "正在加载英雄列表。", noResults: "没有找到英雄。", tBanned: "已禁用", tUsed: "之前对局已使用", tPicked: "已选用", playerPh: "选手名",
+    setN: "第{set}局", seriesWin: "{team} 赢得系列赛", dataVer: "数据 {v}", seriesBan: "系列赛禁用", noneYet: "暂无", timeOver: "超时",
+    resTitle: "[第{set}局 BP]", resBlue: "蓝色方", resRed: "红色方",
+    denied: "无法进入", deniedSub: "请使用主持人发给你的邀请链接", noRoom: "房间不存在", noRoomSub: "房间已过期或地址有误", newRoom: "创建新房间",
+  },
+  ru: {
+    title: "LoL 5v5 — баны и пики", wBan: "Бан", wPick: "Пик", createTitle: "Создать комнату",
+    createDesc: "После создания комнаты можно скопировать ссылки-приглашения для капитанов синей и красной команд. Зрители смотрят через демонстрацию экрана.",
+    lblNameB: "Название синей команды", lblNameR: "Название красной команды", lblTurnSec: "Лимит времени на ход", sec: "{n} с", lblSeries: "Формат серии",
+    bo3: "До 2 побед (Bo3)", bo5: "До 3 побед (Bo5)", fearlessLong: "Fearless (чемпионов, выбранных в прошлых играх, нельзя брать снова)", btnCreate: "Создать комнату",
+    errCreate: "Не удалось создать комнату.", errFull: "Слишком много комнат. Попробуйте позже.", errServer: "Не удалось подключиться к серверу.", lblLang: "Язык",
+    connecting: "Подключение", blueTeam: "Синяя команда", redTeam: "Красная команда", bans: "БАНЫ", picks: "ПИКИ", searchPh: "Поиск чемпиона",
+    roleAll: "Все", roleT: "Топ", roleJ: "Лес", roleM: "Мид", roleA: "Бот", roleS: "Поддержка",
+    noBan: "Без бана", undo: "Отменить", restartSet: "Начать игру заново", lblLimit: "Лимит времени", fearless: "Fearless", series: "Серия",
+    winOf: "Победа: {team}", swap: "Сменить стороны", wipe: "Сбросить всё", copyResult: "Копировать результат", castHide: "Скрыть панель трансляции", castShow: "Показать панель трансляции",
+    links: "Ссылки-приглашения", stopTitle: "МАТЧ ОСТАНОВЛЕН", resume: "Продолжить с этого хода", blueSide: "СИНЯЯ СТОРОНА", redSide: "КРАСНАЯ СТОРОНА",
+    none: "Нет", selecting: "Выбор", capMe: "Моя команда · капитан", capOn: "Капитан подключён", capOff: "Капитан не подключён",
+    phLobby: "Игра {set} · {sec} с на ход", waitStart: "Ожидание начала", seriesOver: "Серия окончена · {b} : {r}",
+    phDoneAdmin: "Игра {set} · после игры нажмите на победившую команду", phDonePlay: "Игра {set} · идёт игра", draftDone: "Драфт завершён",
+    phLive: "Игра {set} · {phase} · {n}/20", turnBan: "{team} — бан", turnPick: "{team} — пик",
+    phase1: "Баны, этап 1", phase2: "Пики, этап 1", phase3: "Баны, этап 2", phase4: "Пики, этап 2",
+    reconnecting: "Переподключение", startDraft: "Начать драфт", waitHost: "Ожидание старта от ведущего", complete: "Готово", stoppedBtn: "Остановлено",
+    viewOnly: "Только просмотр", oppTurn: "Ход соперника", confirmBan: "Подтвердить бан: {champ}", confirmPick: "Подтвердить пик: {champ}",
+    chooseBan: "Выберите чемпиона для бана", choosePick: "Выберите чемпиона для пика", fearlessUsed: "Fearless · использовано: {n}",
+    roleAdmin: "Ведущий (может выбирать за любую команду)", roleB: "Капитан синих", roleR: "Капитан красных", roleCast: "Экран трансляции (только просмотр)",
+    connected: "Подключено", disconnected: "Соединение потеряно, переподключение", myRole: "Моя роль: {who}", noPortraits: "Не удалось загрузить портреты чемпионов, показаны только имена",
+    stopMsgBan: "Команда {team} не сделала бан за отведённые {sec} с.", stopMsgPick: "Команда {team} не сделала пик за отведённые {sec} с.",
+    stopSub: "Остановлено: игра {set} · {phase} · шаг {n}/20", stopWait: "Дождитесь, пока ведущий продолжит",
+    linkB: "Ссылка для капитана синих", linkR: "Ссылка для капитана красных", linkCast: "Экран только для трансляции (для OBS на этом ПК)", copyLink: "Копировать ссылку",
+    linkHint: "Адреса не показываются на экране. Отправляйте ссылку капитана только самому капитану в личном сообщении. Ссылка содержит адрес сервера.",
+    linkHintLocal: "Внешний адрес определить не удалось, ссылки копируются с локальным адресом.", copied: "Скопировано", copyFail: "Не удалось скопировать",
+    loadingChamps: "Загрузка списка чемпионов.", noResults: "Чемпионы не найдены.", tBanned: "Забанен", tUsed: "Использован в прошлой игре", tPicked: "Выбран", playerPh: "Имя игрока",
+    setN: "Игра {set}", seriesWin: "{team} побеждает в серии", dataVer: "Данные {v}", seriesBan: "БАНЫ СЕРИИ", noneYet: "Пока нет", timeOver: "Время вышло",
+    resTitle: "[Драфт, игра {set}]", resBlue: "Синие", resRed: "Красные",
+    denied: "Вход запрещён", deniedSub: "Откройте ссылку-приглашение, полученную от ведущего", noRoom: "Комната не найдена", noRoomSub: "Срок действия комнаты истёк или адрес неверен", newRoom: "Создать новую комнату",
+  },
+};
+
+const params = new URLSearchParams(location.search);
+const ROOM = params.get("room"), KEY = params.get("key") || "";
+
+function pickLang() { // 주소의 ?lang= → 저장해 둔 선택 → 브라우저 언어 순
+  let l = params.get("lang");
+  try { l = l || localStorage.getItem("banpick-lang"); } catch (e) {}
+  if (!l) { const n = (navigator.language || "en").toLowerCase(); l = ["ko", "ja", "zh", "ru"].find(x => n.startsWith(x)) || "en"; }
+  return I18N[l] ? l : "en";
+}
+let LANG = pickLang();
+const T = (k, v) => {
+  let s = I18N[LANG][k] ?? I18N.en[k] ?? k;
+  if (v) for (const x in v) s = s.split("{" + x + "}").join(v[x]);
+  return s;
+};
+let onLang = () => {}; // 언어가 바뀌었을 때 화면을 다시 그리는 함수 (밴픽 화면에서 채움)
+function applyStatic() {
+  document.documentElement.lang = LANGS[LANG][1];
+  document.title = T("title");
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = T(el.dataset.i18nPh); });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", T(el.dataset.i18nAria)); });
+  document.querySelectorAll("select.secs option").forEach(o => { o.textContent = T("sec", { n: o.value }); });
+  document.querySelectorAll(".langsel").forEach(s => { s.value = LANG; });
+}
+document.querySelectorAll(".langsel").forEach(s => {
+  s.innerHTML = Object.entries(LANGS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("");
+  s.onchange = e => {
+    LANG = e.target.value;
+    try { localStorage.setItem("banpick-lang", LANG); } catch (err) {}
+    applyStatic(); onLang();
+  };
+});
+applyStatic();
+
+// ── 방 만들기 ──
+if (!ROOM) {
+  $("create").hidden = false;
+  $("createForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    $("cErr").textContent = "";
+    try {
+      const r = await fetch("/api/rooms", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nameB: $("cNameB").value, nameR: $("cNameR").value, turnSec: Number($("cSec").value), bestOf: Number($("cBo").value), fearless: $("cFearless").checked }) });
+      const j = await r.json();
+      if (!r.ok) { $("cErr").textContent = T(j.error === "full" ? "errFull" : "errCreate"); return; }
+      location.href = `?room=${encodeURIComponent(j.room)}&key=${encodeURIComponent(j.keys.admin)}`;
+    } catch (err) { $("cErr").textContent = T("errServer"); }
+  });
+} else startApp();
+
+function startApp() {
+  $("app").hidden = false;
+  let RAW = [], CHAMPS = [], BY = {}, VER = null;
+  let S = null, role = "cast", online = { B: false, R: false, admin: false, cast: 0 }, keys = null;
+  let pubBase = ""; // 서버가 알려 준 외부 접속 주소
+  // 진행자가 localhost나 내부 IP로 접속 중이면 초대 링크는 외부 주소로 만든다
+  const isPrivateHost = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+  const shareOrigin = () => (isPrivateHost && pubBase) ? pubBase : location.origin;
+  let ws = null, connected = false, refused = "", deadlineAt = 0, filter = "";
+
+  const img = c => c && c.img && VER ? `https://ddragon.leagueoflegends.com/cdn/${VER}/img/champion/${c.img}` : "";
+  const nameOf = id => id ? (BY[id] ? BY[id].name : id) : "";
+  const step = () => ORDER[S.hist.length];
+  const done = () => S.hist.length >= ORDER.length;
+  const isAdmin = () => role === "admin";
+  const teamName = t => (t === "B" ? S.nameB : S.nameR) || T(t === "B" ? "blueTeam" : "redTeam"); // 이름을 비워 두면 보는 사람의 언어로 표시
+  const phaseName = n => T("phase" + (PHASE_ENDS.findIndex(e => n < e) + 1));
+  const myTurn = () => connected && S && S.status === "live" && !done() && (isAdmin() || role === step().team);
+  const send = m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
+
+  function stateOf(id) {
+    const i = S.hist.indexOf(id);
+    if (i >= 0) return ORDER[i].type === "ban" ? "banned" : "p" + ORDER[i].team;
+    if (S.fearless && S.used.includes(id)) return "used";
+    return "";
+  }
+
+  // ── 화면 ──
+  function renderSides() {
+    const live = S.status === "live" && !done();
+    for (const t of ["B", "R"]) {
+      const bans = [], picks = [];
+      ORDER.forEach((o, i) => { if (o.team === t) (o.type === "ban" ? bans : picks)[o.idx] = i; });
+      $("bans" + t).innerHTML = bans.map(i => {
+        const past = i < S.hist.length, now = live && i === S.hist.length;
+        const id = past ? S.hist[i] : now ? S.sel : "", src = img(BY[id]);
+        const body = id ? (src ? `<img src="${esc(src)}" alt="${esc(nameOf(id))}">` : esc(nameOf(id))) : past ? esc(T("none")) : "";
+        return `<div class="ban ${past ? (id ? "filled" : "none") : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""}" title="${esc(nameOf(id))}">${body}</div>`;
+      }).join("");
+      $("picks" + t).innerHTML = picks.map((i, n) => {
+        const past = i < S.hist.length, now = live && i === S.hist.length;
+        const id = past ? S.hist[i] : now ? S.sel : "", src = img(BY[id]);
+        const txt = id ? nameOf(id) : now ? T("selecting") : "";
+        return `<div class="pick ${past ? "filled" : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""}"><span class="no">${t}${n + 1}</span>${src ? `<img src="${esc(src)}" alt="">` : ""}<span class="nm">${esc(txt)}</span></div>`;
+      }).join("");
+      const nm = $("name" + t);
+      if (document.activeElement !== nm) nm.value = (t === "B" ? S.nameB : S.nameR) || "";
+      nm.readOnly = !(isAdmin() || role === t);
+      const cap = $("cap" + t);
+      cap.textContent = role === t ? T("capMe") : online[t] ? T("capOn") : T("capOff");
+      cap.className = "cap" + (role === t ? " me" : online[t] ? " on" : "");
+    }
+  }
+
+  function renderStatus() {
+    const n = S.hist.length, live = S.status === "live" && !done();
+    $("track").innerHTML = ORDER.map((o, i) =>
+      `<i class="${o.team} t-${o.type} ${i < n ? "done" : ""} ${live && i === n ? "now" : ""} ${[5, 11, 15].includes(i) ? "gap" : ""}"></i>`).join("");
+    const turn = $("turn"), o = done() ? null : step(), adm = isAdmin();
+    if (S.status === "lobby") {
+      $("phase").textContent = T("phLobby", { set: S.setNo, sec: S.turnSec });
+      turn.className = "turn"; turn.textContent = T("waitStart");
+    } else if (done()) {
+      $("phase").textContent = S.seriesWinner ? T("seriesOver", { b: S.score.B, r: S.score.R }) : T(adm ? "phDoneAdmin" : "phDonePlay", { set: S.setNo });
+      turn.className = "turn " + (S.seriesWinner || "done");
+      turn.textContent = S.seriesWinner ? T("winOf", { team: teamName(S.seriesWinner) }) : T("draftDone");
+    } else {
+      $("phase").textContent = T("phLive", { set: S.setNo, phase: phaseName(n), n: n + 1 });
+      turn.className = "turn " + o.team;
+      turn.textContent = T(o.type === "ban" ? "turnBan" : "turnPick", { team: teamName(o.team) });
+    }
+    const c = $("confirm");
+    if (!connected) { c.textContent = T("reconnecting"); c.disabled = true; }
+    else if (S.status === "lobby") { c.textContent = T(adm ? "startDraft" : "waitHost"); c.disabled = !adm; }
+    else if (done()) { c.textContent = T("complete"); c.disabled = true; }
+    else if (S.status === "stopped") { c.textContent = T("stoppedBtn"); c.disabled = true; }
+    else if (!myTurn()) { c.textContent = T(role === "cast" ? "viewOnly" : "oppTurn"); c.disabled = true; }
+    else {
+      c.textContent = S.sel ? T(o.type === "ban" ? "confirmBan" : "confirmPick", { champ: nameOf(S.sel) }) : T(o.type === "ban" ? "chooseBan" : "choosePick");
+      c.disabled = !S.sel;
+    }
+    $("noban").disabled = !myTurn() || o.type !== "ban";
+    $("noban").hidden = role === "cast";
+    $("adminA").hidden = $("adminB").hidden = !adm;
+    $("undo").disabled = n === 0;
+    $("reset").disabled = S.status === "lobby" && n === 0;
+    for (const t of ["B", "R"]) { // 밴픽이 끝난 뒤 그 세트의 승리 팀을 누르면 스코어가 오르고 다음 세트로 넘어간다
+      $("win" + t).textContent = T("winOf", { team: teamName(t) });
+      $("win" + t).disabled = !done() || !!S.seriesWinner;
+    }
+    $("optBo").value = S.winsNeeded === 3 ? "5" : "3";
+    $("swap").disabled = S.status === "live";
+    $("optSec").disabled = S.status === "live";
+    if (![...$("optSec").options].some(op => op.value === String(S.turnSec))) $("optSec").add(new Option(T("sec", { n: S.turnSec }), S.turnSec));
+    $("optSec").value = String(S.turnSec);
+    $("optFearless").checked = S.fearless;
+    $("setno").textContent = S.fearless ? T("fearlessUsed", { n: S.used.length }) : "";
+
+    const who = T({ admin: "roleAdmin", B: "roleB", R: "roleR", cast: "roleCast" }[role]);
+    $("net").innerHTML = (connected ? `<b>${esc(T("connected"))}</b>` : `<span class="warn">${esc(T("disconnected"))}</span>`) +
+      ` · ${esc(T("myRole", { who }))}` + (VER ? "" : ` · <span class="warn">${esc(T("noPortraits"))}</span>`);
+
+    // 경기 중단
+    const stopped = S.status === "stopped" && !done();
+    $("stop").classList.toggle("show", stopped);
+    if (stopped) {
+      const t = S.stopBy || o.team;
+      $("stopMsg").textContent = T(o.type === "ban" ? "stopMsgBan" : "stopMsgPick", { team: teamName(t), sec: S.turnSec });
+      $("stopSub").textContent = T("stopSub", { set: S.setNo, phase: phaseName(n), n: n + 1 }) + (adm ? "" : " · " + T("stopWait"));
+      $("stopActs").hidden = !adm;
+    }
+    renderLinks(); tick();
+  }
+
+  let linksKey = "", linkUrls = [], linksOpened = false;
+  function renderLinks() {
+    const box = $("links");
+    box.hidden = !(isAdmin() && keys);
+    if (box.hidden) return;
+    const k = keys.admin + keys.B + keys.R + shareOrigin() + LANG;
+    if (k === linksKey) return;
+    if (!linksOpened) { linksOpened = true; box.open = S.status === "lobby"; } // 처음 열 때 대기 중이면 펼쳐 둔다 (주소는 표시되지 않음)
+    linksKey = k;
+    const path = `${location.pathname}?room=${encodeURIComponent(ROOM)}`;
+    // 주소는 화면에 표시하지 않는다(화면 공유 중 IP 노출 방지). 복사 버튼으로만 전달.
+    const rows = [
+      ["B", T("linkB"), `${shareOrigin()}${path}&key=${keys.B}`],
+      ["R", T("linkR"), `${shareOrigin()}${path}&key=${keys.R}`],
+      ["", T("linkCast"), `${location.origin}${path}&key=${keys.cast}&view=cast&lang=${LANG}`],
+    ];
+    linkUrls = rows.map(r => r[2]);
+    $("linkRows").innerHTML = rows.map(([c, lb], i) => `<span class="lb ${c}">${esc(lb)}</span><button class="btn small" data-i="${i}">${esc(T("copyLink"))}</button>`).join("") +
+      `<span class="hint">${esc(T("linkHint"))}${isPrivateHost && !pubBase ? " " + esc(T("linkHintLocal")) : ""}</span>`;
+  }
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    try { // http 주소로 접속했을 때의 대체 방법
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy"); ta.remove(); return ok;
+    } catch (e) { return false; }
+  }
+  $("links").addEventListener("click", async e => {
+    const b = e.target.closest("[data-i]"); if (!b) return;
+    const ok = await copyText(linkUrls[Number(b.dataset.i)] || "");
+    b.textContent = T(ok ? "copied" : "copyFail");
+    setTimeout(() => { b.textContent = T("copyLink"); }, 1500);
+  });
+
+  function renderGrid() {
+    const g = $("grid");
+    if (!CHAMPS.length) { g.innerHTML = `<div class="empty">${esc(T("loadingChamps"))}</div>`; return; }
+    g.classList.toggle("noimg", !VER);
+    const q = norm($("q").value), turnOk = myTurn();
+    const list = CHAMPS.filter(c => (!filter || c.roles.includes(filter)) && (!q || c.keys.some(k => k.includes(q))));
+    if (!list.length) { g.innerHTML = `<div class="empty">${esc(T("noResults"))}</div>`; return; }
+    g.innerHTML = list.map(c => {
+      const st = S ? stateOf(c.id) : "", src = img(c);
+      const title = st === "banned" ? T("tBanned") : st === "used" ? T("tUsed") : st ? T("tPicked") : "";
+      return `<button class="champ ${st} ${S && S.sel === c.id ? "sel" : ""}" data-id="${esc(c.id)}" ${st || !turnOk ? "disabled" : ""} title="${esc(title)}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : ""}<span>${esc(c.name)}</span></button>`;
+    }).join("");
+  }
+
+  // ── 방송 화면 ──
+  const CAST_ONLY = params.get("view") === "cast";
+  if (CAST_ONLY) document.body.classList.add("castonly");
+  const splash = id => VER && BY[id] && BY[id].img ? `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${encodeURIComponent(id)}_0.jpg` : "";
+  for (const t of ["B", "R"]) {
+    $("cpicks" + t).innerHTML = [0, 1, 2, 3, 4].map(i =>
+      `<div class="cpick" id="cp${t}${i}"><img alt="" hidden onerror="this.hidden=true;this.parentNode.classList.remove('hasimg')"><span class="cno">${t}${i + 1}</span><span class="cchamp"></span>` +
+      `<input class="cplayer" id="pl${t}${i}" maxlength="12" aria-label="${t}${i + 1}" readonly></div>`).join("");
+    $("cpicks" + t).addEventListener("change", e => {
+      const inp = e.target.closest(".cplayer"); if (!inp) return;
+      send({ t: "opts", player: { team: t, idx: Number(inp.id.slice(3)), name: inp.value } });
+    });
+    $("pips" + t).addEventListener("click", e => { // 진행자: 칸을 눌러 세트 스코어 조정
+      const b = e.target.closest("button"); if (!b || !isAdmin()) return;
+      const i = Number(b.dataset.i), score = { ...S.score };
+      score[t] = score[t] === i + 1 ? i : i + 1;
+      send({ t: "opts", score });
+    });
+  }
+  function renderCast() {
+    const live = S.status === "live" && !done(), n = S.hist.length;
+    for (const t of ["B", "R"]) {
+      const bans = [], picks = [];
+      ORDER.forEach((o, i) => { if (o.team === t) (o.type === "ban" ? bans : picks)[o.idx] = i; });
+      $("cbans" + t).innerHTML = bans.map(i => {
+        const past = i < n, now = live && i === n, id = past ? S.hist[i] : now ? S.sel : "", src = img(BY[id]);
+        return `<div class="cban ${now ? "now" : ""}" title="${esc(nameOf(id))}">${id ? (src ? `<img src="${esc(src)}" alt="${esc(nameOf(id))}">` : esc(nameOf(id))) : ""}</div>`;
+      }).join("");
+      picks.forEach((i, k) => {
+        const el = $(`cp${t}${k}`), past = i < n, now = live && i === n, id = past ? S.hist[i] : now ? S.sel : "", src = splash(id);
+        const im = el.querySelector("img");
+        if (src) { if (im.dataset.src !== src) { im.dataset.src = src; im.src = src; im.hidden = false; } }
+        else { im.hidden = true; im.removeAttribute("src"); delete im.dataset.src; }
+        el.className = `cpick ${past ? "filled" : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""} ${src && !im.hidden ? "hasimg" : ""}`;
+        el.querySelector(".cchamp").textContent = id ? nameOf(id) : now ? T("selecting") : "";
+        const inp = el.querySelector(".cplayer");
+        if (document.activeElement !== inp) inp.value = (S.players && S.players[t][k]) || "";
+        inp.readOnly = CAST_ONLY || !(isAdmin() || role === t);
+        inp.placeholder = T("playerPh");
+      });
+      const sc = (S.score && S.score[t]) || 0;
+      const need = S.winsNeeded || 2, pips = $("pips" + t); // 칸 수 = 선승 수
+      if (pips.children.length !== need) pips.innerHTML = Array.from({ length: need }, (_, i) => `<button data-i="${i}" aria-label="${t} ${i + 1}"></button>`).join("");
+      pips.querySelectorAll("button").forEach((b, i) => { b.className = i < sc ? "on" : ""; b.disabled = !isAdmin() || CAST_ONLY; });
+      $("cmName" + t).textContent = teamName(t);
+    }
+    $("cmArrow").textContent = live ? (step().team === "B" ? "◀" : "▶") : "";
+    const mid = S.seriesWinner ? T("seriesWin", { team: teamName(S.seriesWinner) }) : S.status === "lobby" ? T("waitStart") : done() ? T("draftDone") : phaseName(n);
+    $("cmFoot").textContent = [T("setN", { set: S.setNo }), mid, T(S.winsNeeded === 3 ? "bo5" : "bo3")].concat(VER ? [T("dataVer", { v: VER })] : []).join(" · ");
+    // 시리즈 밴: 피어리스에서 이전 세트에 쓴 챔피언, 세트(10명)별 묶음
+    const groups = [];
+    for (let i = 0; i < S.used.length; i += 10) groups.push(S.used.slice(i, i + 10));
+    $("cseries").innerHTML = !S.fearless ? "" : `<span class="lb">${esc(T("seriesBan"))}</span>` + (groups.length ? groups.map((g, gi) =>
+      `<div class="sgroup"><b>${gi + 1}</b><div class="ic">${g.map(id => { const src = img(BY[id]); return src ? `<span title="${esc(nameOf(id))}"><img src="${esc(src)}" alt="${esc(nameOf(id))}"></span>` : `<span class="txt" title="${esc(nameOf(id))}">${esc(nameOf(id).slice(0, 1))}</span>`; }).join("")}</div></div>`).join("")
+      : `<span class="lb" style="font-weight:400;letter-spacing:0">${esc(T("noneYet"))}</span>`);
+    castTick();
+  }
+  function castTick() {
+    const bar = $("ctbar"), el = $("cmTimer");
+    if (!S || S.status !== "live" || done()) {
+      bar.style.transform = "scaleX(0)"; bar.className = "";
+      el.textContent = S && S.status === "stopped" ? T("stopTitle") : ""; el.className = "cm-timer" + (S && S.status === "stopped" ? " stop" : "");
+      return;
+    }
+    const rem = Math.max(0, deadlineAt - performance.now()), sec = Math.ceil(rem / 1000), low = sec <= 10;
+    bar.style.transform = `scaleX(${Math.min(1, rem / (S.turnSec * 1000))})`;
+    bar.className = low ? "low" : step().team;
+    el.textContent = sec; el.className = "cm-timer" + (low ? " low" : "");
+  }
+  setInterval(castTick, 100);
+  let castHidden = false;
+  try { castHidden = localStorage.getItem("banpick-nocast") === "1"; } catch (e) {}
+  const applyCast = () => { document.body.classList.toggle("nocast", castHidden && !CAST_ONLY); $("castToggle").textContent = T(castHidden ? "castShow" : "castHide"); };
+  $("castToggle").onclick = () => { castHidden = !castHidden; try { localStorage.setItem("banpick-nocast", castHidden ? "1" : "0"); } catch (e) {} applyCast(); };
+  applyCast();
+
+  function render() { if (!S) return; renderSides(); renderStatus(); renderGrid(); renderCast(); }
+
+  // ── 시간 바 ──
+  function tick() {
+    const bar = $("tbar"), el = $("timer");
+    if (!S || S.status !== "live" || done()) {
+      bar.style.transform = "scaleX(0)"; bar.className = "";
+      el.textContent = S && S.status === "stopped" ? T("timeOver") : ""; el.className = "timer";
+      return;
+    }
+    const rem = Math.max(0, deadlineAt - performance.now());
+    const sec = Math.ceil(rem / 1000), low = sec <= 10;
+    bar.style.transform = `scaleX(${Math.min(1, rem / (S.turnSec * 1000))})`;
+    bar.className = low ? "low" : step().team;
+    el.textContent = T("sec", { n: sec }); el.className = "timer" + (low ? " low" : "");
+  }
+  setInterval(tick, 100);
+
+  // ── 동작 ──
+  $("grid").addEventListener("click", e => {
+    const b = e.target.closest(".champ"); if (!b || b.disabled || !myTurn()) return;
+    send({ t: "sel", id: S.sel === b.dataset.id ? "" : b.dataset.id });
+  });
+  $("grid").addEventListener("dblclick", e => {
+    const b = e.target.closest(".champ"); if (!b || b.disabled || !myTurn()) return;
+    send({ t: "commit", id: b.dataset.id });
+  });
+  $("confirm").onclick = () => {
+    if (!S) return;
+    if (S.status === "lobby") send({ t: "start" });
+    else if (myTurn() && S.sel) send({ t: "commit", id: S.sel });
+  };
+  $("noban").onclick = () => send({ t: "commit", none: true });
+  $("undo").onclick = () => send({ t: "undo" });
+  $("reset").onclick = $("restart").onclick = () => send({ t: "restart" });
+  $("resume").onclick = () => send({ t: "resume" });
+  $("winB").onclick = () => send({ t: "win", team: "B" });
+  $("winR").onclick = () => send({ t: "win", team: "R" });
+  $("optBo").onchange = e => send({ t: "opts", bestOf: Number(e.target.value) });
+  $("swap").onclick = () => send({ t: "swap" });
+  $("wipe").onclick = () => send({ t: "wipe" });
+  $("optSec").onchange = e => send({ t: "opts", turnSec: Number(e.target.value) });
+  $("optFearless").onchange = e => send({ t: "opts", fearless: e.target.checked });
+  $("nameB").onchange = e => send({ t: "opts", nameB: e.target.value });
+  $("nameR").onchange = e => send({ t: "opts", nameR: e.target.value });
+  $("copy").onclick = async () => {
+    if (!S) return;
+    const line = t => {
+      const b = [], p = [];
+      ORDER.forEach((o, i) => { if (o.team === t && i < S.hist.length) (o.type === "ban" ? b : p).push(nameOf(S.hist[i]) || T("none")); });
+      return `${T(t === "B" ? "resBlue" : "resRed")} ${teamName(t)}\n  ${T("bans")}: ${b.join(", ") || "-"}\n  ${T("picks")}: ${p.join(", ") || "-"}`;
+    };
+    const text = `${T("resTitle", { set: S.setNo })}\n${line("B")}\n${line("R")}`, out = $("out");
+    if (await copyText(text)) { $("copy").textContent = T("copied"); setTimeout(() => { $("copy").textContent = T("copyResult"); }, 1500); }
+    else { out.textContent = text; out.classList.add("show"); }
+  };
+  $("q").oninput = renderGrid;
+  $("q").onkeydown = e => { // Enter: 검색 결과가 하나면 선택, 이미 선택했으면 확정
+    if (e.key !== "Enter" || !myTurn()) return;
+    const open = [...document.querySelectorAll(".champ:not(:disabled)")];
+    if (S.sel && (open.length !== 1 || open[0].dataset.id === S.sel)) { send({ t: "commit", id: S.sel }); e.target.value = ""; }
+    else if (open.length === 1) send({ t: "sel", id: open[0].dataset.id });
+  };
+  document.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+    filter = c.dataset.role;
+    document.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", x === c));
+    renderGrid();
+  });
+
+  // ── 챔피언 목록: 서버가 모든 언어의 이름을 함께 준다 ──
+  function buildChamps() {
+    const loc = LANGS[LANG][1];
+    CHAMPS = RAW.map(c => {
+      const names = c.names || {}, name = names[LANG] || names.en || names.ko || c.id;
+      // 검색은 현재 언어 이름, 영어 이름, 한국어 이름과 초성 모두로 가능
+      const keys = [name, names.en || "", names.ko || "", c.id].map(norm).filter(Boolean);
+      if (names.ko) keys.push(cho(norm(names.ko)));
+      return { id: c.id, img: c.img, roles: c.roles || "", name, keys };
+    }).sort((a, b) => a.name.localeCompare(b.name, loc));
+    BY = Object.fromEntries(CHAMPS.map(c => [c.id, c]));
+  }
+  async function loadChamps() {
+    try {
+      const j = await (await fetch("/api/champions")).json();
+      VER = j.version; RAW = j.list;
+      buildChamps();
+      S ? render() : renderGrid();
+    } catch (e) { setTimeout(loadChamps, 3000); }
+  }
+  function showRefused() {
+    $("turn").textContent = T(refused === "denied" ? "denied" : "noRoom");
+    $("phase").textContent = T(refused === "denied" ? "deniedSub" : "noRoomSub");
+    $("confirm").textContent = "—";
+    $("net").innerHTML = `<a href="${esc(location.pathname)}" style="color:var(--turn)">${esc(T("newRoom"))}</a>`;
+  }
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(`${proto}//${location.host}/ws?room=${encodeURIComponent(ROOM)}&key=${encodeURIComponent(KEY)}`);
+    ws.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (m.t === "noroom" || m.t === "denied") { refused = m.t; showRefused(); return; }
+      if (m.t !== "state") return;
+      connected = true;
+      S = m.s; role = m.role; online = m.online; keys = m.keys || null; pubBase = m.base || "";
+      deadlineAt = performance.now() + (S.remain || 0);
+      render();
+    };
+    ws.onclose = () => { connected = false; if (refused) return; if (S) render(); setTimeout(connect, 1500); };
+    ws.onerror = () => {};
+  }
+  onLang = () => { // 언어 변경: 챔피언 이름과 모든 문구를 다시 그림
+    buildChamps(); applyCast();
+    if (S) render(); else { renderGrid(); if (refused) showRefused(); else { $("turn").textContent = $("confirm").textContent = T("connecting"); } }
+  };
+  $("turn").textContent = $("confirm").textContent = T("connecting");
+  renderGrid();
+  loadChamps();
+  connect();
+}
+</script>
+</body>
+</html>

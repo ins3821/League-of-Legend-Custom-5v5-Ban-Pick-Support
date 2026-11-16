@@ -1,5 +1,4 @@
-# League of Legend Custom 5v5 Ban-Pick Support
-
+# 롤 5대5 실시간 밴픽
 
 **한국어** | [English](README.en.md)
 

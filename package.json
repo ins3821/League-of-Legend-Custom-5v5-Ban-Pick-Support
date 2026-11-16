@@ -1,0 +1,26 @@
+{
+  "name": "lol-banpick-server",
+  "version": "1.6.0",
+  "description": "리그 오브 레전드 5대5 실시간 밴픽 서버",
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js",
+    "build:exe": "pkg . --targets node22-win-x64 --no-bytecode --public-packages \"*\" --public --output dist/lol-banpick.exe"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.25.0"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*"
+    ]
+  }
+}
