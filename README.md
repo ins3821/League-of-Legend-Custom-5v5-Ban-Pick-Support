@@ -33,8 +33,9 @@
 
 ## 빠른 시작 (Windows)
 
-1. [Releases](../../releases/latest)에서 `lol-banpick.exe`를 받습니다.
-2. 더블클릭해서 실행합니다. Node.js 설치는 필요 없습니다.
+1. [Releases](../../releases/latest)에서 `lol-banpick-win.zip`를 받습니다.
+2. 압축 해제 후 `lol-banpick.exe`를 실행합니다.
+참고 - Node.js 설치는 필요 없습니다.
 3. 검은 창이 뜨고 브라우저가 열립니다. **검은 창을 닫으면 서버가 꺼집니다.**
 
 처음 실행할 때 "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요.
