@@ -1,4 +1,4 @@
-# League-of-Legend-Custom-5v5-Ban-Pick-Support
+# League of Legend Custom 5v5 Ban-Pick Support
 
 
 **한국어** | [English](README.en.md)
