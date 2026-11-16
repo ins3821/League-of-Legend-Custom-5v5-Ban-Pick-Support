@@ -48,6 +48,7 @@
 ## 사용 방법
 
 ### 1. 방 만들기
+<img width="731" height="1172" alt="setting" src="https://github.com/user-attachments/assets/1e6a9498-ca15-4768-976b-fa0e55992a94" />
 
 브라우저에 뜬 화면에서 팀 이름, 차례당 제한 시간, 시리즈 방식, 피어리스 여부를 정하고 **방 만들기**를 누릅니다.
 방을 만든 사람이 **진행자**가 됩니다.
