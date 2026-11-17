@@ -40,13 +40,15 @@ Invite links then use a temporary `trycloudflare.com` address, which also keeps 
 | Role | Can do |
 |---|---|
 | Host (created the room) | Start, resume, undo, record the set winner, swap sides, change options, choose on any turn |
-| Captain | Use First Selection (side or pick order), choose on their own team's turns, rename their team, enter player names |
+| Captain | Use First Selection (side or pick order), swap lanes after the draft, choose on their own team's turns, rename their team, enter player names |
 | Broadcast view | View only |
 
 - There is no spectator link. Spectators watch through screen sharing; connections without a key are refused.
 - The captain links contain the server address. Send them privately.
 - Creating a room only asks for the two team names. Before each game the team holding **First Selection** chooses **either** a side (blue/red) **or** the pick order (first/second), and the other team decides what is left. First Selection is random for game 1 (the host can hand it to the other team) and goes to the loser of the previous game afterwards. The first-pick team bans and picks first, on either side.
-- A selected champion is previewed for everyone and the edge of its slot blinks until it is locked in.
+- A selected champion is previewed for everyone and the edge of its slot blinks until it is locked in. On your turn the champion list frame also blinks in your team's colour.
+- **Lane swap time**: when the 20 steps are done a 30-second swap period starts. The pick slots are labelled Top / Jungle / Mid / Bot / Support; click two of your team's picks to swap them (captains during the swap period for their own team, the host for both and also afterwards). Player names stay with the slot. The host can end it early or change its length (off / 15 / 30 / 60 s).
+- **End sound**: when the swap period ends a short sound plays and the draft is complete; draft music keeps playing until then. The default is a built-in synthesized sound. To use your own, put `end.mp3`, `end.ogg` or `end.wav` next to the program.
 - **Draft music** (bottom of the page) plays in your own browser only; share audio when screen sharing. Add any YouTube link, or edit `bgm.json` next to the program (`bgm.js` in the source). Listed videos are third-party uploads and may be removed or block embedding. No audio is included in this project; check the rights of each track before using it on a stream.
 - After each game the host presses "**(team) wins**": the score box fills and the next game starts. Reaching the required wins ends the series.
 - Room state lives in memory only. Restarting the server removes running rooms; idle rooms are removed after 12 hours.

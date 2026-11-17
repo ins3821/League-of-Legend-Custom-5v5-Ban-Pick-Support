@@ -118,6 +118,7 @@ function createRoom(o = {}) {
     s: {
       hist: [], sel: '', used: [], setNo: 1,
       fearless: !!o.fearless, turnSec: clampSec(o.turnSec),
+      swapSec: 30, // 밴픽이 끝난 뒤 라인 스왑 시간(초). 0이면 스왑 시간 없이 바로 완료
       nameB: clean(o.nameB, 16), nameR: clean(o.nameR, 16), // 비어 있으면 화면에서 각자 언어의 기본 이름으로 표시
       status: 'setup', // setup(진영·선후픽 정하기) | lobby | live | stopped | done
       first: 'B', // 선픽인 진영
@@ -148,7 +149,7 @@ function broadcast(room) {
   const s = room.s;
   const online = { B: false, R: false, admin: false, cast: 0 };
   for (const c of room.clients) { if (c.role === 'cast') online.cast++; else online[c.role] = true; }
-  const state = { ...s, remain: s.status === 'live' ? Math.max(0, s.deadline - Date.now()) : 0 };
+  const state = { ...s, remain: s.status === 'live' || s.status === 'swap' ? Math.max(0, s.deadline - Date.now()) : 0 };
   for (const c of room.clients) {
     if (c.readyState !== 1) continue;
     const msg = { t: 'state', s: state, role: c.role, online };
@@ -157,6 +158,18 @@ function broadcast(room) {
   }
 }
 
+// 밴픽 20단계가 끝나면 라인 스왑 시간을 준 뒤 완료 처리한다
+function finishDraft(room) {
+  const s = room.s;
+  clearTimeout(room.timer); room.timer = null;
+  if (!(s.swapSec > 0)) { s.status = 'done'; s.deadline = 0; return; }
+  s.status = 'swap'; s.deadline = Date.now() + s.swapSec * 1000;
+  room.timer = setTimeout(() => {
+    if (s.status !== 'swap') return;
+    s.status = 'done'; s.deadline = 0;
+    broadcast(room);
+  }, s.swapSec * 1000);
+}
 function disarm(room) { clearTimeout(room.timer); room.timer = null; room.s.deadline = 0; }
 function arm(room) {
   clearTimeout(room.timer);
@@ -204,7 +217,7 @@ function handle(room, role, m) {
       if (m.none) { if (step.type !== 'ban') return; }
       else { id = clean(m.id, 40) || s.sel; if (!id || !available(s, id)) return; }
       s.hist.push(id); s.sel = '';
-      if (s.hist.length >= ORDER.length) { s.status = 'done'; disarm(room); } else arm(room);
+      if (s.hist.length >= ORDER.length) finishDraft(room); else arm(room);
       break;
     }
     case 'start':
@@ -236,6 +249,20 @@ function handle(room, role, m) {
       else { s.setup = null; s.status = 'lobby'; }
       break;
     }
+    case 'swapPick': { // 밴픽이 끝난 뒤 라인 스왑: 같은 팀의 두 픽 자리를 맞바꾼다 (a, b = 0~4번째 픽 칸)
+      const t = m.team, a = Number(m.a), b = Number(m.b);
+      // 주장은 스왑 시간(status 'swap') 동안만, 진행자는 완료 후에도 고칠 수 있다
+      if ((t !== 'B' && t !== 'R') || !(s.status === 'swap' ? (admin || role === t) : (s.status === 'done' && admin))) return;
+      if (![a, b].every(x => Number.isInteger(x) && x >= 0 && x < 5) || a === b) return;
+      const at = [];
+      for (let i = 0; i < ORDER.length; i++) { const o = stepAt(s, i); if (o.team === t && o.type === 'pick') at.push(i); }
+      [s.hist[at[a]], s.hist[at[b]]] = [s.hist[at[b]], s.hist[at[a]]];
+      break;
+    }
+    case 'endSwap': // 진행자: 스왑 시간을 바로 끝냄
+      if (!admin || s.status !== 'swap') return;
+      disarm(room); s.status = 'done';
+      break;
     case 'giveFirst': // 진행자: 첫 번째 선택권을 상대 팀에게 넘김 (가위바위보 등으로 따로 정했을 때)
       if (!admin || s.status !== 'setup' || !s.setup || s.setup.stage !== 1) return;
       s.setup.chooser = other(s.setup.chooser); s.setup.why = 'host';
@@ -265,7 +292,7 @@ function handle(room, role, m) {
       s.status = 'setup'; s.setup = { chooser: coin(), stage: 1, need: '', why: 'random' };
       break;
     case 'swap': // 진행자: 진영 교체
-      if (!admin || s.status === 'live') return;
+      if (!admin || s.status === 'live' || s.status === 'swap') return;
       swapSides(room);
       break;
     case 'opts': {
@@ -273,6 +300,7 @@ function handle(room, role, m) {
       if (m.nameR !== undefined && (admin || role === 'R')) s.nameR = clean(m.nameR, 16);
       if (admin && m.fearless !== undefined) s.fearless = !!m.fearless;
       if (admin && m.turnSec !== undefined && s.status !== 'live') s.turnSec = clampSec(m.turnSec);
+      if (admin && m.swapSec !== undefined && s.status !== 'swap') { const v = Math.round(Number(m.swapSec)); if (v >= 0 && v <= 120) s.swapSec = v; }
       if (m.player && (m.player.team === 'B' || m.player.team === 'R') && (admin || role === m.player.team)) {
         const i = Number(m.player.idx);
         if (Number.isInteger(i) && i >= 0 && i < 5) s.players[m.player.team][i] = clean(m.player.name, 12);
@@ -309,6 +337,16 @@ const server = http.createServer((req, res) => {
     });
   } else if (req.method === 'GET' && url.pathname === '/api/champions') {
     sendJson(res, 200, champs);
+  } else if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/sfx/end') {
+    // 종료 효과음을 직접 넣고 싶으면 프로그램과 같은 폴더에 end.mp3 / end.ogg / end.wav 중 하나를 둔다
+    const types = { mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav' };
+    const ext = Object.keys(types).find(e => fs.existsSync(path.join(APP_DIR, 'end.' + e)));
+    if (!ext) { res.writeHead(404); return res.end(); }
+    fs.readFile(path.join(APP_DIR, 'end.' + ext), (err, buf) => {
+      if (err) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': types[ext], 'Content-Length': buf.length, 'Cache-Control': 'no-cache' });
+      res.end(req.method === 'HEAD' ? undefined : buf);
+    });
   } else if (req.method === 'GET' && url.pathname === '/api/bgm') {
     sendJson(res, 200, loadBgm());
   } else if (req.method === 'POST' && url.pathname === '/api/rooms') {

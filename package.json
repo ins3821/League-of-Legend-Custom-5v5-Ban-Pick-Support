@@ -1,6 +1,6 @@
 {
   "name": "lol-banpick-server",
-  "version": "1.8.0",
+  "version": "1.10.0",
   "description": "리그 오브 레전드 5대5 실시간 밴픽 서버",
   "main": "server.js",
   "bin": "server.js",

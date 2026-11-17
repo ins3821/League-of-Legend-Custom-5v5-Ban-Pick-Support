@@ -57,6 +57,7 @@ button{cursor:pointer}
 .timebar i{display:block;height:100%;width:100%;transform-origin:center;transform:scaleX(0);background:var(--muted);transition:transform .1s linear}
 .timebar i.B{background:var(--blue)} .timebar i.R{background:var(--red)}
 .timebar i.low{background:var(--turn)}
+.timebar i.sw,.cast-time i.sw{background:var(--text)}
 @media (prefers-reduced-motion:reduce){.timebar i{transition:none}}
 
 /* 상단 */
@@ -245,6 +246,18 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
 @media (prefers-reduced-motion:no-preference){
   .pick.preview::after,.ban.preview::after,.cpick.preview::after,.cban.preview::after,.champ.sel::after{animation:edgeglow 1.3s ease-in-out infinite}
 }
+/* 내 차례: 챔피언 목록 창 테두리가 차례인 팀 색으로 깜박인다 */
+.pool{position:relative;padding:8px;border-radius:8px}
+.pool.turnB{--gc:var(--blue);--gg:rgba(61,155,255,.65)} .pool.turnR{--gc:var(--red);--gg:rgba(255,92,98,.65)}
+.pool.turnB::after,.pool.turnR::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 0 2px var(--gc),inset 0 0 22px 1px var(--gg)}
+@media (prefers-reduced-motion:no-preference){.pool.turnB::after,.pool.turnR::after{animation:edgeglow 1.3s ease-in-out infinite}}
+/* 라인 스왑: 밴픽이 끝나면 픽 칸을 눌러 자리를 바꾼다 */
+.pick.swappable,.cpick.swappable{cursor:pointer}
+.pick.swappable:hover{border-color:var(--text)}
+.pick.swapsel{outline:3px solid var(--turn);outline-offset:-1px}
+.cpick.swappable:hover{filter:brightness(1.25)}
+.cpick.swapsel{box-shadow:0 0 0 3px var(--turn) inset}
+.pick .no{min-width:1.6em}
 /* 선택권 단계에서는 챔피언 목록을 숨긴다 */
 .insetup .pool .tools,.insetup .pool .grid{display:none}
 .pool{overflow:hidden}
@@ -379,6 +392,9 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
     <label class="opt"><span data-i18n="lblLimit"></span>
       <select id="optSec" class="secs"><option value="20"></option><option value="30"></option><option value="45"></option><option value="60"></option></select>
     </label>
+    <label class="opt"><span data-i18n="lblSwapSec"></span>
+      <select id="optSwap" class="secs"><option value="0"></option><option value="15"></option><option value="30"></option><option value="60"></option></select>
+    </label>
     <label class="opt"><input type="checkbox" id="optFearless"> <span data-i18n="fearless"></span></label>
     <label class="opt"><span data-i18n="series"></span>
       <select id="optBo"><option value="3" data-i18n="bo3"></option><option value="5" data-i18n="bo5"></option></select>
@@ -404,6 +420,8 @@ body.castonly .cast{position:fixed;left:0;right:0;bottom:0;display:block}
         <label class="opt"><span data-i18n="bgmVol"></span><input type="range" id="bgmVol" min="0" max="100" value="40"></label>
         <label class="opt"><input type="checkbox" id="bgmLoop" checked> <span data-i18n="bgmLoop"></span></label>
         <label class="opt"><input type="checkbox" id="bgmAuto"> <span data-i18n="bgmAuto"></span></label>
+        <label class="opt"><input type="checkbox" id="sfxOn" checked> <span data-i18n="sfxEnd"></span></label>
+        <button class="btn small" id="sfxTest" data-i18n="sfxTest"></button>
       </div>
       <div class="bgm-ctl">
         <input type="text" id="bgmName" maxlength="40" data-i18n-ph="bgmNamePh">
@@ -504,12 +522,14 @@ const I18N = {
     setupWhyLoser: "직전 세트에서 진 팀이 첫 번째 선택권을 가집니다.",
     setupWhy2: "남은 항목을 고르세요.", setupRandom: "전부 무작위로 정하기", setupWait: "선택을 기다리는 중입니다",
     firstPick: "선픽", secondPick: "후픽", flipFirst: "선후픽 교체",
-    bgm: "밴픽 브금", bgmPlay: "재생", bgmStop: "정지", bgmVol: "음량", bgmLoop: "반복", bgmAuto: "밴픽 진행 중 자동 재생", bgmWorlds: "롤드컵", bgmCustom: "직접 추가한 곡",
+    bgm: "밴픽 브금", bgmPlay: "재생", bgmStop: "정지", bgmVol: "음량", bgmLoop: "반복", bgmAuto: "밴픽·스왑 진행 중 자동 재생", bgmWorlds: "롤드컵", bgmCustom: "직접 추가한 곡",
     bgmNamePh: "곡 이름 (선택)", bgmUrlPh: "유튜브 주소", bgmAddBtn: "추가", bgmDelBtn: "선택한 곡 삭제",
     bgmErrEmbed: "이 영상은 다른 사이트에서의 재생이 막혀 있습니다.", bgmErrGone: "영상을 재생할 수 없습니다. 삭제됐거나 비공개일 수 있습니다.", bgmErrLoad: "유튜브 플레이어를 불러오지 못했습니다.",
     bgmBadUrl: "유튜브 주소를 인식하지 못했습니다.", bgmOnlyCustom: "직접 추가한 곡만 삭제할 수 있습니다.", bgmOpen: "유튜브에서 열기",
     bgmNote: "브금은 이 브라우저에서만 재생됩니다. 화면 공유로 들려주려면 소리 공유를 켜세요.",
     lblTeam1: "팀 1 이름", lblTeam2: "팀 2 이름", team1: "팀 1", team2: "팀 2", fsTitle: "첫 번째 선택권: {team}", fsRule: "진영 선택과 밴픽 순서 중 한 가지만 고릅니다. 고르지 않은 쪽은 상대 팀이 정합니다.", setupWhyHost: "진행자가 첫 번째 선택권을 정했습니다.", fsChose: "{team}의 선택: {choice}", grpSide: "진영 선택", grpOrder: "밴픽 순서", fsGive: "선택권을 상대 팀에게 넘기기",
+    swapHint: "두 픽을 차례로 누르면 라인이 바뀝니다",
+    phSwap: "{set}세트 · 라인 스왑 시간", swapTurn: "라인 스왑", endSwap: "스왑 끝내기", swapping: "라인 스왑 중", lblSwapSec: "스왑 시간", swapOff: "없음", sfxEnd: "종료 효과음", sfxTest: "효과음 들어보기",
     denied: "들어올 수 없습니다", deniedSub: "진행자에게 받은 초대 링크로 접속해 주세요", noRoom: "없는 방입니다", noRoomSub: "방이 만료되었거나 주소가 잘못되었습니다", newRoom: "새 방 만들기",
   },
   en: {
@@ -546,12 +566,14 @@ const I18N = {
     setupWhyLoser: "The team that lost the previous game has First Selection.",
     setupWhy2: "Choose the remaining option.", setupRandom: "Randomize everything", setupWait: "Waiting for the choice",
     firstPick: "First pick", secondPick: "Second pick", flipFirst: "Swap pick order",
-    bgm: "Draft music", bgmPlay: "Play", bgmStop: "Stop", bgmVol: "Volume", bgmLoop: "Loop", bgmAuto: "Play automatically during the draft", bgmWorlds: "Worlds", bgmCustom: "Added by you",
+    bgm: "Draft music", bgmPlay: "Play", bgmStop: "Stop", bgmVol: "Volume", bgmLoop: "Loop", bgmAuto: "Play automatically during draft and swap", bgmWorlds: "Worlds", bgmCustom: "Added by you",
     bgmNamePh: "Track name (optional)", bgmUrlPh: "YouTube link", bgmAddBtn: "Add", bgmDelBtn: "Remove selected",
     bgmErrEmbed: "This video does not allow playback on other sites.", bgmErrGone: "This video cannot be played. It may be deleted or private.", bgmErrLoad: "Could not load the YouTube player.",
     bgmBadUrl: "That does not look like a YouTube link.", bgmOnlyCustom: "Only tracks you added can be removed.", bgmOpen: "Open on YouTube",
     bgmNote: "Music plays only in this browser. To let others hear it over screen sharing, share audio too.",
     lblTeam1: "Team 1 name", lblTeam2: "Team 2 name", team1: "Team 1", team2: "Team 2", fsTitle: "First Selection: {team}", fsRule: "Choose only one: a side or the pick order. The other team decides the one you leave.", setupWhyHost: "The host assigned First Selection.", fsChose: "{team} chose: {choice}", grpSide: "SIDE", grpOrder: "PICK ORDER", fsGive: "Give First Selection to the other team",
+    swapHint: "Click two picks to swap their lanes",
+    phSwap: "Game {set} · Lane swap time", swapTurn: "Lane swap", endSwap: "End swap time", swapping: "Lane swap in progress", lblSwapSec: "Swap time", swapOff: "Off", sfxEnd: "End sound", sfxTest: "Test sound",
     denied: "Access denied", deniedSub: "Open the invite link you received from the host", noRoom: "Room not found", noRoomSub: "The room has expired or the address is wrong", newRoom: "Create a new room",
   },
   ja: {
@@ -588,12 +610,14 @@ const I18N = {
     setupWhyLoser: "前のゲームで負けたチームがファーストセレクションを持ちます。",
     setupWhy2: "残りの項目を選んでください。", setupRandom: "すべてランダムで決める", setupWait: "選択を待っています",
     firstPick: "先ピック", secondPick: "後ピック", flipFirst: "ピック順を入れ替え",
-    bgm: "ドラフトBGM", bgmPlay: "再生", bgmStop: "停止", bgmVol: "音量", bgmLoop: "リピート", bgmAuto: "ドラフト中に自動再生", bgmWorlds: "Worlds", bgmCustom: "追加した曲",
+    bgm: "ドラフトBGM", bgmPlay: "再生", bgmStop: "停止", bgmVol: "音量", bgmLoop: "リピート", bgmAuto: "ドラフト・スワップ中に自動再生", bgmWorlds: "Worlds", bgmCustom: "追加した曲",
     bgmNamePh: "曲名（任意）", bgmUrlPh: "YouTubeのURL", bgmAddBtn: "追加", bgmDelBtn: "選択した曲を削除",
     bgmErrEmbed: "この動画は他サイトでの再生が許可されていません。", bgmErrGone: "この動画は再生できません。削除または非公開の可能性があります。", bgmErrLoad: "YouTubeプレーヤーを読み込めませんでした。",
     bgmBadUrl: "YouTubeのURLを認識できませんでした。", bgmOnlyCustom: "削除できるのは自分で追加した曲だけです。", bgmOpen: "YouTubeで開く",
     bgmNote: "BGMはこのブラウザでのみ再生されます。画面共有で聞かせるには音声共有をオンにしてください。",
     lblTeam1: "チーム1の名前", lblTeam2: "チーム2の名前", team1: "チーム1", team2: "チーム2", fsTitle: "ファーストセレクション: {team}", fsRule: "サイドとピック順のどちらか一方だけを選びます。選ばなかった方は相手チームが決めます。", setupWhyHost: "進行役がファーストセレクションを指定しました。", fsChose: "{team} の選択: {choice}", grpSide: "サイド", grpOrder: "ピック順", fsGive: "選択権を相手チームに渡す",
+    swapHint: "ピックを2つ順にクリックするとレーンが入れ替わります",
+    phSwap: "第{set}ゲーム · レーンスワップ時間", swapTurn: "レーンスワップ", endSwap: "スワップを終了", swapping: "レーンスワップ中", lblSwapSec: "スワップ時間", swapOff: "なし", sfxEnd: "終了サウンド", sfxTest: "サウンドを試聴",
     denied: "入室できません", deniedSub: "進行役から受け取った招待リンクでアクセスしてください", noRoom: "ルームが見つかりません", noRoomSub: "ルームの期限が切れたか、アドレスが間違っています", newRoom: "新しいルームを作成",
   },
   zh: {
@@ -630,12 +654,14 @@ const I18N = {
     setupWhyLoser: "上一局的负方拥有优先选择权。",
     setupWhy2: "请选择剩下的一项。", setupRandom: "全部随机决定", setupWait: "等待选择",
     firstPick: "先选", secondPick: "后选", flipFirst: "交换选人顺序",
-    bgm: "BP 背景音乐", bgmPlay: "播放", bgmStop: "停止", bgmVol: "音量", bgmLoop: "循环", bgmAuto: "BP 进行时自动播放", bgmWorlds: "全球总决赛", bgmCustom: "自己添加的曲目",
+    bgm: "BP 背景音乐", bgmPlay: "播放", bgmStop: "停止", bgmVol: "音量", bgmLoop: "循环", bgmAuto: "BP 和换位期间自动播放", bgmWorlds: "全球总决赛", bgmCustom: "自己添加的曲目",
     bgmNamePh: "曲名（可选）", bgmUrlPh: "YouTube 链接", bgmAddBtn: "添加", bgmDelBtn: "删除所选曲目",
     bgmErrEmbed: "该视频不允许在其他网站播放。", bgmErrGone: "无法播放该视频，可能已被删除或设为私享。", bgmErrLoad: "无法加载 YouTube 播放器。",
     bgmBadUrl: "无法识别该 YouTube 链接。", bgmOnlyCustom: "只能删除自己添加的曲目。", bgmOpen: "在 YouTube 打开",
     bgmNote: "音乐只在此浏览器中播放。如需通过屏幕共享让他人听到，请同时共享声音。",
     lblTeam1: "队伍1名称", lblTeam2: "队伍2名称", team1: "队伍1", team2: "队伍2", fsTitle: "优先选择权：{team}", fsRule: "阵营和选人顺序只能选一项。没有选的那一项由对方决定。", setupWhyHost: "主持人指定了优先选择权。", fsChose: "{team} 选择了：{choice}", grpSide: "阵营", grpOrder: "选人顺序", fsGive: "把选择权交给对方",
+    swapHint: "依次点击两个英雄即可交换位置",
+    phSwap: "第{set}局 · 换位时间", swapTurn: "交换位置", endSwap: "结束换位", swapping: "正在换位", lblSwapSec: "换位时间", swapOff: "无", sfxEnd: "结束音效", sfxTest: "试听音效",
     denied: "无法进入", deniedSub: "请使用主持人发给你的邀请链接", noRoom: "房间不存在", noRoomSub: "房间已过期或地址有误", newRoom: "创建新房间",
   },
   ru: {
@@ -672,12 +698,14 @@ const I18N = {
     setupWhyLoser: "Право первого выбора у команды, проигравшей прошлую игру.",
     setupWhy2: "Выберите оставшийся вариант.", setupRandom: "Определить всё случайно", setupWait: "Ожидание выбора",
     firstPick: "Первый пик", secondPick: "Второй пик", flipFirst: "Поменять очерёдность",
-    bgm: "Музыка драфта", bgmPlay: "Играть", bgmStop: "Стоп", bgmVol: "Громкость", bgmLoop: "Повтор", bgmAuto: "Включать автоматически во время драфта", bgmWorlds: "Worlds", bgmCustom: "Добавлено вами",
+    bgm: "Музыка драфта", bgmPlay: "Играть", bgmStop: "Стоп", bgmVol: "Громкость", bgmLoop: "Повтор", bgmAuto: "Включать автоматически во время драфта и обмена", bgmWorlds: "Worlds", bgmCustom: "Добавлено вами",
     bgmNamePh: "Название (необязательно)", bgmUrlPh: "Ссылка на YouTube", bgmAddBtn: "Добавить", bgmDelBtn: "Удалить выбранное",
     bgmErrEmbed: "Это видео нельзя воспроизводить на других сайтах.", bgmErrGone: "Видео не воспроизводится. Возможно, оно удалено или скрыто.", bgmErrLoad: "Не удалось загрузить проигрыватель YouTube.",
     bgmBadUrl: "Не удалось распознать ссылку на YouTube.", bgmOnlyCustom: "Удалять можно только добавленные вами треки.", bgmOpen: "Открыть на YouTube",
     bgmNote: "Музыка играет только в этом браузере. Чтобы её слышали при демонстрации экрана, включите передачу звука.",
     lblTeam1: "Название команды 1", lblTeam2: "Название команды 2", team1: "Команда 1", team2: "Команда 2", fsTitle: "Право первого выбора: {team}", fsRule: "Выберите только одно: сторону или очерёдность пика. Оставшееся решает соперник.", setupWhyHost: "Право первого выбора назначил ведущий.", fsChose: "Выбор {team}: {choice}", grpSide: "СТОРОНА", grpOrder: "ОЧЕРЁДНОСТЬ ПИКА", fsGive: "Передать право выбора сопернику",
+    swapHint: "Нажмите на два пика, чтобы поменять их линии",
+    phSwap: "Игра {set} · время на обмен линиями", swapTurn: "Обмен линиями", endSwap: "Завершить обмен", swapping: "Идёт обмен линиями", lblSwapSec: "Время на обмен", swapOff: "Нет", sfxEnd: "Звук завершения", sfxTest: "Проверить звук",
     denied: "Вход запрещён", deniedSub: "Откройте ссылку-приглашение, полученную от ведущего", noRoom: "Комната не найдена", noRoomSub: "Срок действия комнаты истёк или адрес неверен", newRoom: "Создать новую комнату",
   },
 };
@@ -704,7 +732,7 @@ function applyStatic() {
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = T(el.dataset.i18nPh); });
   document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", T(el.dataset.i18nAria)); });
-  document.querySelectorAll("select.secs option").forEach(o => { o.textContent = T("sec", { n: o.value }); });
+  document.querySelectorAll("select.secs option").forEach(o => { o.textContent = o.value === "0" ? T("swapOff") : T("sec", { n: o.value }); });
   document.querySelectorAll(".langsel").forEach(s => { s.value = LANG; });
 }
 document.querySelectorAll(".langsel").forEach(s => {
@@ -752,6 +780,23 @@ function startApp() {
   const isAdmin = () => role === "admin";
   const teamName = t => (t === "B" ? S.nameB : S.nameR) || T(t === "B" ? "blueTeam" : "redTeam"); // 이름을 비워 두면 보는 사람의 언어로 표시
   const phaseName = n => T("phase" + (PHASE_ENDS.findIndex(e => n < e) + 1));
+  // 라인 스왑: 밴픽이 끝난 뒤 자기 팀(진행자는 양 팀) 픽 칸 두 개를 차례로 눌러 자리를 바꾼다. 칸 순서 = 탑·정글·미드·원딜·서폿
+  const LANES = ["roleT", "roleJ", "roleM", "roleA", "roleS"];
+  let swapSel = null; // { team, k } 첫 번째로 누른 칸
+  // 주장은 스왑 시간 동안만, 진행자는 완료 후에도 바꿀 수 있다
+  const canSwap = t => connected && S && params.get("view") !== "cast" && (S.status === "swap" ? (isAdmin() || role === t) : (S.status === "done" && isAdmin()));
+  const slotLabel = (t, k) => (S.status === "done" || S.status === "swap" ? T(LANES[k]) : `${t}${k + 1}`);
+  // 시간 바: 밴픽 차례와 스왑 시간에 흐른다
+  const timing = () => !!S && (S.status === "swap" || (S.status === "live" && !done()));
+  const totalMs = () => (S.status === "swap" ? S.swapSec : S.turnSec) * 1000;
+  const barCls = low => (low ? "low" : S.status === "swap" ? "sw" : step().team);
+  function onSwapClick(t, k) {
+    if (!canSwap(t)) return;
+    if (!swapSel || swapSel.team !== t) swapSel = { team: t, k };
+    else if (swapSel.k === k) swapSel = null;
+    else { send({ t: "swapPick", team: t, a: swapSel.k, b: k }); swapSel = null; }
+    render();
+  }
   const myTurn = () => connected && S && S.status === "live" && !done() && (isAdmin() || role === step().team);
   const send = m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
 
@@ -778,7 +823,8 @@ function startApp() {
         const past = i < S.hist.length, now = live && i === S.hist.length;
         const id = past ? S.hist[i] : now ? S.sel : "", src = img(BY[id]);
         const txt = id ? nameOf(id) : now ? T("selecting") : "";
-        return `<div class="pick ${past ? "filled" : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""}"><span class="no">${t}${n + 1}</span>${src ? `<img src="${esc(src)}" alt="">` : ""}<span class="nm">${esc(txt)}</span></div>`;
+        const sw = canSwap(t) ? "swappable" + (swapSel && swapSel.team === t && swapSel.k === n ? " swapsel" : "") : "";
+        return `<div class="pick ${past ? "filled" : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""} ${sw}" data-k="${n}"><span class="no">${esc(slotLabel(t, n))}</span>${src ? `<img src="${esc(src)}" alt="">` : ""}<span class="nm">${esc(txt)}</span></div>`;
       }).join("");
       const nm = $("name" + t);
       if (document.activeElement !== nm) nm.value = (t === "B" ? S.nameB : S.nameR) || "";
@@ -801,8 +847,11 @@ function startApp() {
     } else if (S.status === "lobby") {
       $("phase").textContent = T("phLobby", { set: S.setNo, sec: S.turnSec });
       turn.className = "turn"; turn.textContent = T("waitStart");
+    } else if (S.status === "swap") {
+      $("phase").textContent = T("phSwap", { set: S.setNo }) + (canSwap("B") || canSwap("R") ? " · " + T("swapHint") : "");
+      turn.className = "turn done"; turn.textContent = T("swapTurn");
     } else if (done()) {
-      $("phase").textContent = S.seriesWinner ? T("seriesOver", { b: S.score.B, r: S.score.R }) : T(adm ? "phDoneAdmin" : "phDonePlay", { set: S.setNo });
+      $("phase").textContent = (S.seriesWinner ? T("seriesOver", { b: S.score.B, r: S.score.R }) : T(adm ? "phDoneAdmin" : "phDonePlay", { set: S.setNo })) + (canSwap("B") || canSwap("R") ? " · " + T("swapHint") : "");
       turn.className = "turn " + (S.seriesWinner || "done");
       turn.textContent = S.seriesWinner ? T("winOf", { team: teamName(S.seriesWinner) }) : T("draftDone");
     } else {
@@ -814,6 +863,7 @@ function startApp() {
     if (!connected) { c.textContent = T("reconnecting"); c.disabled = true; }
     else if (S.status === "setup") { c.textContent = T("setupTitle"); c.disabled = true; }
     else if (S.status === "lobby") { c.textContent = T(adm ? "startDraft" : "waitHost"); c.disabled = !adm; }
+    else if (S.status === "swap") { c.textContent = T(adm ? "endSwap" : "swapping"); c.disabled = !adm; }
     else if (done()) { c.textContent = T("complete"); c.disabled = true; }
     else if (S.status === "stopped") { c.textContent = T("stoppedBtn"); c.disabled = true; }
     else if (!myTurn()) { c.textContent = T(role === "cast" ? "viewOnly" : "oppTurn"); c.disabled = true; }
@@ -828,10 +878,13 @@ function startApp() {
     $("reset").disabled = S.status === "lobby" && n === 0;
     for (const t of ["B", "R"]) { // 밴픽이 끝난 뒤 그 세트의 승리 팀을 누르면 스코어가 오르고 다음 세트로 넘어간다
       $("win" + t).textContent = T("winOf", { team: teamName(t) });
-      $("win" + t).disabled = !done() || !!S.seriesWinner;
+      $("win" + t).disabled = S.status !== "done" || !!S.seriesWinner;
     }
     $("optBo").value = S.winsNeeded === 3 ? "5" : "3";
-    $("swap").disabled = S.status === "live";
+    $("swap").disabled = S.status === "live" || S.status === "swap";
+    $("optSwap").disabled = S.status === "swap";
+    if (![...$("optSwap").options].some(op => op.value === String(S.swapSec))) $("optSwap").add(new Option(T("sec", { n: S.swapSec }), S.swapSec));
+    $("optSwap").value = String(S.swapSec);
     $("flipFirst").disabled = S.status === "live" || n > 0;
     $("optSec").disabled = S.status === "live";
     if (![...$("optSec").options].some(op => op.value === String(S.turnSec))) $("optSec").add(new Option(T("sec", { n: S.turnSec }), S.turnSec));
@@ -852,6 +905,10 @@ function startApp() {
       $("stopSub").textContent = T("stopSub", { set: S.setNo, phase: phaseName(n), n: n + 1 }) + (adm ? "" : " · " + T("stopWait"));
       $("stopActs").hidden = !adm;
     }
+    // 내 차례면 챔피언 목록 창 테두리를 차례인 팀 색으로 깜박인다
+    const pool = document.querySelector(".pool"), mine = myTurn();
+    pool.classList.toggle("turnB", mine && o.team === "B");
+    pool.classList.toggle("turnR", mine && o.team === "R");
     renderSetup(); renderLinks(); tick();
   }
 
@@ -970,7 +1027,9 @@ function startApp() {
         const im = el.querySelector("img");
         if (src) { if (im.dataset.src !== src) { im.dataset.src = src; im.src = src; im.hidden = false; } }
         else { im.hidden = true; im.removeAttribute("src"); delete im.dataset.src; }
-        el.className = `cpick ${past ? "filled" : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""} ${src && !im.hidden ? "hasimg" : ""}`;
+        const sw = canSwap(t) ? "swappable" + (swapSel && swapSel.team === t && swapSel.k === k ? " swapsel" : "") : "";
+        el.className = `cpick ${past ? "filled" : ""} ${now ? "now" : ""} ${now && id ? "preview" : ""} ${src && !im.hidden ? "hasimg" : ""} ${sw}`;
+        el.querySelector(".cno").textContent = slotLabel(t, k);
         el.querySelector(".cchamp").textContent = id ? nameOf(id) : now ? T("selecting") : "";
         const inp = el.querySelector(".cplayer");
         if (document.activeElement !== inp) inp.value = (S.players && S.players[t][k]) || "";
@@ -985,7 +1044,7 @@ function startApp() {
       $("cmLbl" + t).textContent = T(t === "B" ? "blueSide" : "redSide") + (S.status === "setup" ? "" : " · " + T(S.first === t ? "firstPick" : "secondPick"));
     }
     $("cmArrow").textContent = live ? (step().team === "B" ? "◀" : "▶") : "";
-    const mid = S.seriesWinner ? T("seriesWin", { team: teamName(S.seriesWinner) }) : S.status === "setup" ? T("setupTitle") : S.status === "lobby" ? T("waitStart") : done() ? T("draftDone") : phaseName(n);
+    const mid = S.seriesWinner ? T("seriesWin", { team: teamName(S.seriesWinner) }) : S.status === "setup" ? T("setupTitle") : S.status === "lobby" ? T("waitStart") : S.status === "swap" ? T("swapTurn") : done() ? T("draftDone") : phaseName(n);
     $("cmFoot").textContent = [T("setN", { set: S.setNo }), mid, T(S.winsNeeded === 3 ? "bo5" : "bo3")].concat(VER ? [T("dataVer", { v: VER })] : []).join(" · ");
     // 시리즈 밴: 피어리스에서 이전 세트에 쓴 챔피언, 세트(10명)별 묶음
     const groups = [];
@@ -997,14 +1056,14 @@ function startApp() {
   }
   function castTick() {
     const bar = $("ctbar"), el = $("cmTimer");
-    if (!S || S.status !== "live" || done()) {
+    if (!timing()) {
       bar.style.transform = "scaleX(0)"; bar.className = "";
       el.textContent = S && S.status === "stopped" ? T("stopTitle") : ""; el.className = "cm-timer" + (S && S.status === "stopped" ? " stop" : "");
       return;
     }
     const rem = Math.max(0, deadlineAt - performance.now()), sec = Math.ceil(rem / 1000), low = sec <= 10;
-    bar.style.transform = `scaleX(${Math.min(1, rem / (S.turnSec * 1000))})`;
-    bar.className = low ? "low" : step().team;
+    bar.style.transform = `scaleX(${Math.min(1, rem / totalMs())})`;
+    bar.className = barCls(low);
     el.textContent = sec; el.className = "cm-timer" + (low ? " low" : "");
   }
   setInterval(castTick, 100);
@@ -1014,20 +1073,26 @@ function startApp() {
   $("castToggle").onclick = () => { castHidden = !castHidden; try { localStorage.setItem("banpick-nocast", castHidden ? "1" : "0"); } catch (e) {} applyCast(); };
   applyCast();
 
-  function render() { if (!S) return; renderSides(); renderStatus(); renderGrid(); renderCast(); }
+  function render() { if (!S) return; if (S.status !== "done" && S.status !== "swap") swapSel = null; renderSides(); renderStatus(); renderGrid(); renderCast(); }
+  for (const t of ["B", "R"]) {
+    $("picks" + t).addEventListener("click", e => { const p = e.target.closest(".pick"); if (p) onSwapClick(t, Number(p.dataset.k)); });
+    $("cpicks" + t).addEventListener("click", e => { // 선수 이름 입력란을 누른 것은 제외
+      const p = e.target.closest(".cpick"); if (p && !e.target.closest(".cplayer")) onSwapClick(t, Number(p.id.slice(3)));
+    });
+  }
 
   // ── 시간 바 ──
   function tick() {
     const bar = $("tbar"), el = $("timer");
-    if (!S || S.status !== "live" || done()) {
+    if (!timing()) {
       bar.style.transform = "scaleX(0)"; bar.className = "";
       el.textContent = S && S.status === "stopped" ? T("timeOver") : ""; el.className = "timer";
       return;
     }
     const rem = Math.max(0, deadlineAt - performance.now());
     const sec = Math.ceil(rem / 1000), low = sec <= 10;
-    bar.style.transform = `scaleX(${Math.min(1, rem / (S.turnSec * 1000))})`;
-    bar.className = low ? "low" : step().team;
+    bar.style.transform = `scaleX(${Math.min(1, rem / totalMs())})`;
+    bar.className = barCls(low);
     el.textContent = T("sec", { n: sec }); el.className = "timer" + (low ? " low" : "");
   }
   setInterval(tick, 100);
@@ -1044,6 +1109,7 @@ function startApp() {
   $("confirm").onclick = () => {
     if (!S) return;
     if (S.status === "lobby") send({ t: "start" });
+    else if (S.status === "swap") send({ t: "endSwap" });
     else if (myTurn() && S.sel) send({ t: "commit", id: S.sel });
   };
   $("noban").onclick = () => send({ t: "commit", none: true });
@@ -1057,6 +1123,7 @@ function startApp() {
   $("flipFirst").onclick = () => send({ t: "flipFirst" });
   $("wipe").onclick = () => send({ t: "wipe" });
   $("optSec").onchange = e => send({ t: "opts", turnSec: Number(e.target.value) });
+  $("optSwap").onchange = e => send({ t: "opts", swapSec: Number(e.target.value) });
   $("optFearless").onchange = e => send({ t: "opts", fearless: e.target.checked });
   $("nameB").onchange = e => send({ t: "opts", nameB: e.target.value });
   $("nameR").onchange = e => send({ t: "opts", nameR: e.target.value });
@@ -1155,14 +1222,52 @@ function startApp() {
     saveCustom(a.filter(x => x.id !== id)); bgmMsg(""); fillBgm();
   };
   fetch("/api/bgm").then(r => r.json()).then(a => { bgmList = Array.isArray(a) ? a : []; fillBgm(); }).catch(() => fillBgm());
+  // ── 종료 효과음: 스왑 시간이 끝나 밴픽이 완전히 마무리될 때 한 번 울린다 ──
+  // 프로그램 폴더에 end.mp3 / end.ogg / end.wav 가 있으면 그 파일을, 없으면 내장 합성음을 쓴다.
+  let endFile = false, audioCtx = null;
+  fetch("/sfx/end", { method: "HEAD" }).then(r => { endFile = r.ok; }).catch(() => {});
+  try { $("sfxOn").checked = localStorage.getItem("banpick-sfx") !== "0"; } catch (e) {}
+  $("sfxOn").onchange = e => { try { localStorage.setItem("banpick-sfx", e.target.checked ? "1" : "0"); } catch (err) {} };
+  function synthEnd(vol) { // 낮은 타격음 + 위로 쌓이는 화음 + 짧은 바람 소리
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    audioCtx = audioCtx || new AC();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const ac = audioCtx, t = ac.currentTime + 0.03, out = ac.createGain();
+    out.gain.value = vol; out.connect(ac.destination);
+    const hit = ac.createOscillator(), hg = ac.createGain();
+    hit.type = "sine"; hit.frequency.setValueAtTime(160, t); hit.frequency.exponentialRampToValueAtTime(40, t + 0.5);
+    hg.gain.setValueAtTime(0.9, t); hg.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    hit.connect(hg); hg.connect(out); hit.start(t); hit.stop(t + 1.05);
+    [293.66, 440, 587.33, 880].forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(), s = t + 0.05 + i * 0.08;
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s); g.gain.linearRampToValueAtTime(0.2, s + 0.02); g.gain.exponentialRampToValueAtTime(0.001, s + 2.4);
+      o.connect(g); g.connect(out); o.start(s); o.stop(s + 2.5);
+    });
+    const len = Math.floor(ac.sampleRate * 0.5), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const n = ac.createBufferSource(), f = ac.createBiquadFilter(), ng = ac.createGain();
+    n.buffer = buf; f.type = "bandpass"; f.frequency.setValueAtTime(600, t); f.frequency.exponentialRampToValueAtTime(5000, t + 0.4);
+    ng.gain.value = 0.18; n.connect(f); f.connect(ng); ng.connect(out); n.start(t);
+  }
+  function playEnd() {
+    const vol = Math.max(0, Math.min(1, Number($("bgmVol").value) / 100));
+    try {
+      if (endFile) { const a = new Audio("/sfx/end"); a.volume = vol; a.play().catch(() => synthEnd(vol)); }
+      else synthEnd(vol);
+    } catch (e) {}
+  }
+  $("sfxTest").onclick = playEnd;
+
   let lastStatus = "";
-  function bgmAuto() { // 드래프트가 시작되면 재생, 끝나면 정지 (옵션을 켰을 때만)
-    const now = S.status;
-    if ($("bgmAuto").checked && now !== lastStatus) {
-      if (now === "live" && lastStatus !== "stopped") bgmPlay();
-      else if (now === "done" || now === "lobby" || now === "setup") bgmStop();
-    }
+  function bgmAuto() { // 상태가 바뀔 때: 드래프트가 시작되면 브금 재생, 스왑 시간까지 이어지고, 완료되면 정지 + 종료 효과음
+    const now = S.status, was = lastStatus;
     lastStatus = now;
+    if (!was || was === now) return;
+    if (now === "done" && (was === "swap" || was === "live") && $("sfxOn").checked && params.get("view") !== "cast") playEnd();
+    if (!$("bgmAuto").checked) return;
+    if (now === "live" && was !== "stopped" && was !== "swap" && was !== "done") bgmPlay();
+    else if (now === "done" || now === "lobby" || now === "setup") bgmStop();
   }
 
   // ── 챔피언 목록: 서버가 모든 언어의 이름을 함께 준다 ──

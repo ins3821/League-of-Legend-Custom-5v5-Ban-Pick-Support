@@ -77,13 +77,36 @@ const first = (room, key) => new Promise(res => { const w = new WebSocket(`${WS}
   admin.send({ t: 'resume' }); await sleep(100);
   assert.equal(st().status, 'live'); assert(st().remain > 4000, '재개하면 시간이 다시 채워짐');
 
+  admin.send({ t: 'opts', swapSec: 2 }); await sleep(50);
   for (let i = 2; i < 20; i++) {
     const c = cap[ORDER[i][0]];
     if (i === 7) c.send({ t: 'commit', none: true }); // 픽 차례에는 '없음' 불가
     c.send({ t: 'commit', id: ids[i] }); await sleep(40);
   }
   await sleep(100);
-  assert.equal(st().status, 'done'); assert.equal(st().hist.length, 20);
+
+  // ── 라인 스왑 시간: 밴픽이 끝나면 스왑 시간이 흐르고, 그동안 자기 팀 픽 두 칸을 맞바꿀 수 있다 ──
+  assert.equal(st().status, 'swap', '밴픽이 끝나면 스왑 시간'); assert.equal(st().hist.length, 20); assert(st().remain > 1000);
+  const before = st().hist.slice(); // 블루 픽 자리는 6, 9, 10, 17, 18번째
+  admin.send({ t: 'win', team: 'B' }); cap.R.send({ t: 'swapPick', team: 'B', a: 0, b: 4 }); cap.B.send({ t: 'swapPick', team: 'B', a: 0, b: 7 }); cap.B.send({ t: 'endSwap' }); await sleep(100);
+  assert.deepEqual(st().hist, before, '다른 팀 픽이나 잘못된 칸은 바꿀 수 없음'); assert.equal(st().status, 'swap', '스왑 중에는 승리 기록·주장의 종료 불가');
+  cap.B.send({ t: 'swapPick', team: 'B', a: 0, b: 4 }); await sleep(100);
+  assert.equal(st().hist[6], before[18]); assert.equal(st().hist[18], before[6]); assert.equal(st().hist[7], before[7], '상대 픽은 그대로');
+  await sleep(2100);
+  assert.equal(st().status, 'done', '스왑 시간이 지나면 완료'); assert.equal(st().remain, 0);
+  cap.R.send({ t: 'swapPick', team: 'R', a: 1, b: 2 }); await sleep(100);
+  assert.equal(st().hist[8], before[8], '스왑 시간이 끝나면 주장은 바꿀 수 없음');
+  admin.send({ t: 'swapPick', team: 'R', a: 1, b: 2 }); await sleep(100);
+  assert.equal(st().hist[8], before[11]); assert.equal(st().hist[11], before[8], '진행자는 완료 후에도 고칠 수 있음');
+  // 되돌린 뒤 다시 끝내면 스왑 시간이 다시 시작되고, 진행자는 바로 끝낼 수 있다
+  const lastPick = st().hist[19];
+  admin.send({ t: 'undo' }); await sleep(100);
+  assert.equal(st().status, 'live');
+  cap.R.send({ t: 'commit', id: lastPick }); await sleep(100);
+  assert.equal(st().status, 'swap');
+  admin.send({ t: 'endSwap' }); await sleep(100);
+  assert.equal(st().status, 'done', '진행자는 스왑 시간을 바로 끝낼 수 있음');
+  admin.send({ t: 'opts', swapSec: 0 }); await sleep(50);
 
   // ── 선수 이름, 세트 승리, 스코어 ──
   cap.B.send({ t: 'opts', player: { team: 'B', idx: 0, name: '탑솔러' } });
@@ -124,6 +147,8 @@ const first = (room, key) => new Promise(res => { const w = new WebSocket(`${WS}
   assert.equal(st().hist.length, 6, '피어리스: 이전 세트 픽 사용 불가');
   cap.B.send({ t: 'commit', id: ids[60] }); await sleep(100);
   assert.equal(st().hist.length, 7);
+  cap.B.send({ t: 'swapPick', team: 'R', a: 0, b: 1 }); await sleep(100);
+  assert.equal(st().hist[6], ids[60], '밴픽 진행 중에는 라인 스왑 불가');
 
   // ── 시리즈 방식과 종료 ──
   admin.send({ t: 'opts', bestOf: 5 }); admin.send({ t: 'opts', score: { B: 0, R: 3 } }); await sleep(100);
